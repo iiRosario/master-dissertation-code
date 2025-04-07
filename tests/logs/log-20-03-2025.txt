@@ -1,0 +1,5 @@
+=== Início do Log ===
+[11:22:01] Este é um teste de log.
+[11:22:01] Outra entrada de log.
+[11:22:10] Este é um teste de log.
+[11:22:10] Outra entrada de log.
