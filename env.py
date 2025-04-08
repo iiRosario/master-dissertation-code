@@ -10,7 +10,7 @@ PATH_SAVED_MODELS_LEARNER_C = os.path.join(BASE_DIR, "models", "train", "learner
 
 
 DATA_DIR = "data"
-LABELED = "labeled"
+LABELED = "original_data"
 ANNOTATIONS_DIR = os.path.join(DATA_DIR, LABELED, "annotations")
 TRAIN_IMAGES_DIR = os.path.join(DATA_DIR, LABELED, "train")
 VAL_IMAGES_DIR = os.path.join(DATA_DIR, LABELED, "val")
