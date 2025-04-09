@@ -2,6 +2,7 @@ import json
 import matplotlib.pyplot as plt
 from collections import Counter
 import os
+import csv
 from env import *  # TRAIN_ANNOTATIONS_FILE, VAL_ANNOTATIONS_FILE, TEST_ANNOTATIONS_FILE
 
 # Function to load COCO annotations
@@ -46,6 +47,17 @@ def plot_top_20_classes(coco_json_paths):
         else:
             print(f"⚠️ File {path} not found.")
 
+    # Save the results for all classes to a CSV file
+    csv_filename = "class_counts.csv"
+    with open(csv_filename, mode='w', newline='', encoding='utf-8') as csv_file:
+        writer = csv.writer(csv_file)
+        writer.writerow(["Class", "Nº Imgs", "Nº Annotations"])
+        for cat_id, cat_name in categories.items():
+            img_count = total_image_counts[cat_id]
+            ann_count = total_annotation_counts[cat_id]
+            writer.writerow([cat_name, img_count, ann_count])
+    print(f"\n✅ Class-wise data saved to {csv_filename}")
+
     # Top 20 by images
     top_images = total_image_counts.most_common(20)
     top_annots = total_annotation_counts.most_common(20)
@@ -57,11 +69,8 @@ def plot_top_20_classes(coco_json_paths):
     annot_class_names = [categories[cid] for cid, _ in top_annots]
     annot_counts = [count for _, count in top_annots]
 
-    # Colors
-    img_colors = [plt.cm.get_cmap('tab20c')(i / 20) for i in range(len(img_class_names))]
-    annot_colors = [plt.cm.get_cmap('tab20c')(i / 20) for i in range(len(annot_class_names))]
-
     # Plot: Top 20 Images
+    img_colors = [plt.cm.get_cmap('tab20c')(i / 20) for i in range(len(img_class_names))]
     plt.figure(figsize=(10, 6))
     plt.barh(img_class_names, img_counts, color=img_colors)
     plt.xlabel('Nº of Images')
@@ -72,6 +81,7 @@ def plot_top_20_classes(coco_json_paths):
     plt.show()
 
     # Plot: Top 20 Annotations
+    annot_colors = [plt.cm.get_cmap('tab20c')(i / 20) for i in range(len(annot_class_names))]
     plt.figure(figsize=(10, 6))
     plt.barh(annot_class_names, annot_counts, color=annot_colors)
     plt.xlabel('Nº of Annotations')
@@ -82,5 +92,5 @@ def plot_top_20_classes(coco_json_paths):
     plt.show()
 
 # Example usage
-coco_json_paths = [TRAIN_ANNOTATIONS_FILE, VAL_ANNOTATIONS_FILE]
+coco_json_paths = [NEW_ANNOTATIONS_FILE]
 plot_top_20_classes(coco_json_paths)

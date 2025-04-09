@@ -1,28 +1,25 @@
-from ultralytics import YOLO
 import numpy as np
+import torch
+import torch.nn as nn
 import os
 from env import *
 
 class Learner:
-    def __init__(self, id_, query_strat, path_init_model, path_saved_models):
+    def __init__(self, id_, query_strat, model):
         """
         Class representing a Learner.
         
         :param id_: Unique identifier of the learner.
         :param model_path: Path to the trained YOLO model.
         """
-        self.id = id_
-        self.model = YOLO(path_init_model)
+        self.model = model
         self.x_trained_data = []              # IMGS
         self.y_trained_data = []              # ANNOTATIONS
         self.query_strat = query_strat
-        self.path_saved_models = path_saved_models
         self.num_fits = 0
 
 
         
-
-
     def fit(self, x, y, data, epochs, imgsz, optimizer='Adam'):
         """
         Fit the YOLO model using the current batch of data.

@@ -2,7 +2,7 @@ import numpy as np
 from env import *
 
 class Annotator:
-    def __init__(self, id=-1, alphas=None, specialized_class=None, seed=0, num_classes=10, interval_normal=None, interval_specialized=None, interval_na=None):
+    def __init__(self, id=-1, seed=0, num_classes=10):
         """
         Class representing an annotator.
         
@@ -13,57 +13,53 @@ class Annotator:
         """
         self.id = id
         self.seed = seed
-        self.interval_normal = interval_normal
-        self.interval_specialized = interval_specialized
-        self.interval_na = interval_na
         self.num_classes = num_classes
         np.random.seed(self.seed)
-        
-        self.specialized_class = specialized_class  # Agora é um único inteiro
-        self.alphas = alphas if alphas is not None else self.init_alphas()
+        self.confusion_matrix = self.init_confusion_matrix()
         self.avg_reputation = 0.00
         self.reputations = [0.00 for _ in range(num_classes)]
         
 
-    def init_alphas(self):
+    def init_confusion_matrix(self):
         """
-        Initializes the list of alphas, allowing one class to be specialized.
+        Initializes the confusion matrix for the annotator using Dirichlet distributions.
 
-        :return: List of alphas initialized with specialization.
+        Each row i represents the probability distribution over the labels assigned
+        by the annotator when the true class is i.
+
+        :return: Confusion matrix as a numpy array of shape (num_classes, num_classes)
         """
-        # Generate alphas normally within the range for all classes
-        alphas = np.random.uniform(self.interval_normal[0], self.interval_normal[1], self.num_classes).tolist()
+        confusion_matrix = np.zeros((self.num_classes, self.num_classes))
 
-        # If there is a specialized class, apply the specialized range
-        if self.specialized_class is not None and 0 <= self.specialized_class < self.num_classes:
-            alphas[self.specialized_class] = np.random.uniform(self.interval_specialized[0], self.interval_specialized[1])
-            
-            # Ensure the value does not exceed the upper limit
-            if alphas[self.specialized_class] > INTERVAL_UPPER_LIMIT:
-                alphas[self.specialized_class] = INTERVAL_UPPER_LIMIT
-        
-        # Round all values to two decimal places
-        alphas = [round(alpha, 2) for alpha in alphas]
+        for true_class in range(self.num_classes):
+            # Build alpha vector for Dirichlet: high value for the correct class, low for others
+            alpha_vector = [1.0] * self.num_classes
+            alpha_vector[true_class] = self.alphas[true_class]  # Higher confidence in the true class
 
-        # Generate the NA class alpha separately
-        na_alpha = round(np.random.uniform(self.interval_na[0], self.interval_na[1]), 2)
-        alphas.append(na_alpha)
-        
-        return alphas
+            # Sample from Dirichlet to get the probability distribution
+            confusion_matrix[true_class] = np.random.dirichlet(alpha_vector)
 
-    def add_alpha(self, alpha):
-        """Adds a new alpha value to the list."""
-        self.alphas.append(alpha)
+        return confusion_matrix
 
-    def get_alphas(self) -> list:
-        """Returns the list of alphas."""
-        return self.alphas
 
     def __repr__(self):
+        matrix_str = np.array2string(self.confusion_matrix, precision=2, suppress_small=True)
         return (f"\nAnnotator:\n"
                 f"ID: {self.id}\n"
                 f"Seed: {self.seed}\n"
-                f"Specialized Class: {self.specialized_class}\n"
-                f"Alphas: {self.alphas}\n"
                 f"Reputations: {self.reputations}\n"
-                f"Avg Reputation: {self.avg_reputation}\n")
+                f"Avg Reputation: {self.avg_reputation}\n"
+                f"Confusion Matrix:\n{matrix_str}\n")
+
+
+
+
+
+    def rate_other(self, other):
+        """
+        Rates another annotator based on their alphas and the specialized class.
+
+        :param other: Another Annotator instance.
+        :return: Rating value.
+        """
+       
