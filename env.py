@@ -1,7 +1,11 @@
 import os
+from modAL.uncertainty import uncertainty_sampling, margin_sampling, entropy_sampling
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))  # Diretório do main.py
 PATH_LOG = os.path.join(BASE_DIR, "logs")
+
+RESULTS_PATH = os.path.join(BASE_DIR, "runs")
+
 
 CLASSES = [0, 1, 2]
 TRAIN_SIZE_PERCENTAGE = 0.7
@@ -12,13 +16,20 @@ DATA_AUG_NOISE_FACTOR = 0.5
 
 ### LEARNER CONFIGURATION ###
 INIT_TRAINING_PERCENTAGE = 0.1
-INIT_TRAINING_EPHOCHS = 3
+INIT_TRAINING_EPHOCHS = 2
+INIT_LEARNING_RATE = 0.9
+
+QUERY_STRATEGY = uncertainty_sampling 
+#QUERY_STRATEGY = "margin_sampling"  # "uncertainty_sampling" or "random_sampling"
+#QUERY_STRATEGY = "entropy_sampling"
+
+
 
 MODELS= os.path.join(BASE_DIR, "models")
 
 
 ## Active Learning Configuration
-NUM_CYCLES = 100
+NUM_CYCLES = 300
 NUM_ANNOTATORS = 30
 
 DATA_DIR = "data"

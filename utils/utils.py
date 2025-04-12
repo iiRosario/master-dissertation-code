@@ -1,24 +1,17 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from modAL.models import ActiveLearner
-from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, confusion_matrix
-from modAL.uncertainty import uncertainty_sampling
 import torch
-import torch.optim as optim
-import torch.nn as nn
-from entities.LeNet5 import LeNet5
-from torch.utils.data import Subset, DataLoader, random_split, ConcatDataset
-from torchvision import datasets, transforms
+from torch.utils.data import Subset
 from collections import Counter
 from env import *
+import csv
 from torchvision.transforms import functional as F
 
 def get_label_distribution(dataset):
     labels = [dataset[i][1] for i in range(len(dataset))]
     return Counter(labels)
 
-def plot_distribution(distribution, split_name, colors=['royalblue', 'tomato', 'goldenrod']
-                      ):
+def plot_distribution(distribution, split_name, colors=['royalblue', 'tomato', 'goldenrod']):
     classes = sorted(distribution.keys())
     counts = [distribution[c] for c in classes]
 
@@ -67,12 +60,6 @@ def plot_sample_images(dataset, classes=[0, 1, 2], num_samples=3):
     plt.show()
 
 
-
-
-
-
-
-
 # Filter dataset for selected classes (e.g., [0, 1, 2])
 def filter_classes(dataset, classes=[0, 1, 2]):
     indices = []
@@ -83,68 +70,52 @@ def filter_classes(dataset, classes=[0, 1, 2]):
     return Subset(dataset, indices)
 
 
+def extract_data(loader):
+    data_list = []
+    label_list = []
+    for data, labels in loader:
+        data_list.append(data)       # shape: [batch_size, 1, 28, 28]
+        label_list.append(labels)    # shape: [batch_size]
+    
+    data = torch.cat(data_list, dim=0)     
+    labels = torch.cat(label_list, dim=0)
+    
+    return data, labels
 
 
 
-def evaluate_model(model, dataloader, device):
-    model.eval()
-    model.to(device)
+def write_metrics_to_csv(csv_path, csv_name, cycle, oracle_label, ground_truth_label, metrics):
+    fieldnames = ["cycle", "accuracy_per_class", "precision_per_class", 
+                  "recall_per_class", "f1_score_per_class", "sensitivity_per_class",
+                  "specificity_per_class", "confusion_matrix", 
+                  "oracle_label", "ground_truth_label"]
 
-    all_preds = []
-    all_labels = []
+    
+    # Caminho completo para o ficheiro
+    full_csv_path = os.path.join(csv_path, csv_name)
+    file_exists = os.path.isfile(full_csv_path)
 
-    with torch.no_grad():
-        for images, labels in dataloader:
-            images = images.to(device)
-            labels = labels.to(device)
+    with open(full_csv_path, mode='a', newline='') as csv_file:
+        writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
 
-            outputs = model(images)
-            _, preds = torch.max(outputs, 1)
+        # Escreve o cabeçalho se o ficheiro for novo
+        if not file_exists:
+            writer.writeheader()
 
-            all_preds.extend(preds.cpu().numpy())
-            all_labels.extend(labels.cpu().numpy())
+        writer.writerow({
+            "cycle": cycle,
+            "accuracy_per_class": metrics["accuracy_per_class"],
+            "precision_per_class": metrics["precision_per_class"],
+            "recall_per_class": metrics["recall_per_class"],
+            "f1_score_per_class": metrics["f1_score_per_class"],
+            "sensitivity_per_class": metrics["sensitivity_per_class"],
+            "specificity_per_class": metrics["specificity_per_class"],
+            "confusion_matrix": metrics["confusion_matrix"],
+            "oracle_label": oracle_label,
+            "ground_truth_label": ground_truth_label
+        })
 
-    all_preds = np.array(all_preds)
-    all_labels = np.array(all_labels)
-
-    # Métricas gerais
-    acc = accuracy_score(all_labels, all_preds)
-    precision = precision_score(all_labels, all_preds, average='weighted', zero_division=0)
-    recall = recall_score(all_labels, all_preds, average='weighted', zero_division=0)
-    f1 = f1_score(all_labels, all_preds, average='weighted', zero_division=0)
-
-    # Matriz de confusão
-    cm = confusion_matrix(all_labels, all_preds)
-
-    # Sensitivity (Recall para cada classe)
-    sensitivity_per_class = recall_score(all_labels, all_preds, average=None, zero_division=0)
-
-    # Specificity (calculada a partir da matriz de confusão)
-    specificity_per_class = []
-    for i in range(len(cm)):
-        tn = cm.sum() - (cm[i, :].sum() + cm[:, i].sum() - cm[i, i])
-        fp = cm[:, i].sum() - cm[i, i]
-        specificity = tn / (tn + fp) if (tn + fp) > 0 else 0
-        specificity_per_class.append(specificity)
-
-    print(f"Accuracy: {acc:.4f}")
-    print(f"Precision (weighted): {precision:.4f}")
-    print(f"Recall (weighted): {recall:.4f}")
-    print(f"F1 Score (weighted): {f1:.4f}")
-    print("\nSensitivity per class:", sensitivity_per_class)
-    print("Specificity per class:", specificity_per_class)
-    print("\nConfusion Matrix:\n", cm)
-
-    return {
-        "accuracy": acc,
-        "precision": precision,
-        "recall": recall,
-        "f1_score": f1,
-        "sensitivity_per_class": sensitivity_per_class,
-        "specificity_per_class": specificity_per_class,
-        "confusion_matrix": cm
-    }
-
+    
 
 
 ############################### DATA AUGMENTATION ###############################

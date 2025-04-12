@@ -4,26 +4,65 @@ import torch
 import torch.optim as optim
 import torch.nn as nn
 from modAL.models import ActiveLearner
-from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, confusion_matrix
-from modAL.uncertainty import uncertainty_sampling
+from sklearn.model_selection import train_test_split
 from torch.utils.data import Subset, DataLoader, random_split, ConcatDataset
 from torchvision import datasets, transforms
 from entities.Annotator import Annotator
 from entities.Committee import Committee
 from entities.LeNet5 import LeNet5
-from utils.Logger import Logger
 from env import *
-import matplotlib.pyplot as plt
 from collections import Counter
 from utils.DataManager import *
 from utils.utils import *
+import random
+import shutil
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print("Using device:", device)
 
+def print_distribuition(x_init_train, y_init_train, x_rest_train, y_rest_train, x_val, y_val, x_test, y_test):
 
-def init_model_lenet5(device=device):
-    model = LeNet5().to(device)
+    y_init_train_numpy = y_init_train.numpy() if isinstance(y_init_train, torch.Tensor) else y_init_train
+    y_rest_train_numpy = y_rest_train.numpy() if isinstance(y_rest_train, torch.Tensor) else y_rest_train
+
+
+    #y_test = y_test.numpy() if isinstance(y_test, torch.Tensor) else y_test
+    
+    print(f"x_init_train: {len(x_init_train)}, y_init_train:", Counter(y_init_train_numpy))
+    print(f"x_rest_train: {len(x_rest_train)}, y_rest_train:", Counter(y_rest_train_numpy))
+    
+    
+    #print("x_test: ", len(x_test))
+    #print("Distribuição em y_test:", Counter(y_test))
+
+def create_results_dir(seed):
+    if QUERY_STRATEGY == margin_sampling:
+        results_dir_name = f"results_margin_sampling_{seed}"
+    elif QUERY_STRATEGY == entropy_sampling:
+        results_dir_name = f"results_entropy_sampling_{seed}"
+    else:
+        results_dir_name = f"results_uncertainty_sampling_{seed}"
+    
+    results_dir_path = os.path.join(RESULTS_PATH, results_dir_name)
+
+    # Remove a pasta se ela já existir
+    if os.path.exists(results_dir_path):
+        shutil.rmtree(results_dir_path)
+
+    # Cria a nova pasta
+    os.makedirs(results_dir_path, exist_ok=True)
+    
+    return results_dir_path
+
+# Função para fornecer um rótulo aleatório (simulando o "oracle" aleatório)
+def annotator_query(image, seed):
+    # Supondo que as classes possíveis sejam 0, 1 e 2
+    possible_classes = [0, 1, 2]  # Substituir por suas classes reais, se necessário
+    # Retorna um rótulo aleatório entre as classes
+    return random.choice(possible_classes)
+
+def init_model_lenet5(device=device, epochs=INIT_TRAINING_EPHOCHS, lr=INIT_LEARNING_RATE, batch_size=64):
+    model = LeNet5(device)
     output_dir = MODELS
     os.makedirs(output_dir, exist_ok=True)
     save_path = os.path.join(output_dir, "lenet_base.pth")
@@ -34,7 +73,7 @@ def init_model_lenet5(device=device):
 
 
 
-def initial_training(model, train_loader, val_loader, train_percentage=0.1, num_epochs=2, lr=0.9):
+def initial_training(model, train_loader, val_loader, train_percentage=0.1, num_epochs=2, lr=0.9, seed=0):
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(model.parameters(), lr=lr, weight_decay=1e-4)
 
@@ -42,7 +81,7 @@ def initial_training(model, train_loader, val_loader, train_percentage=0.1, num_
     train_size = int(train_percentage * total_train_size)
 
     # Criar subset com base no train_percentage
-    np.random.seed(0)  # Para reprodutibilidade
+    np.random.seed(seed)
     indices = np.random.choice(total_train_size, train_size, replace=False)
 
     # Mostrar distribuição das classes no subset
@@ -90,40 +129,77 @@ def initial_training(model, train_loader, val_loader, train_percentage=0.1, num_
     return model, train_losses, val_losses
 
 # Active learning loop
-def init_active_learning(train_set, test_set, val_set, train_percentage, seed):
-    train_loader = DataLoader(train_set, batch_size=64, shuffle=True)
-    val_loader = DataLoader(val_set, batch_size=64, shuffle=True)
-    test_loader = DataLoader(test_set, batch_size=64, shuffle=True)
+def init_active_learning(train_loader, val_loader, test_loader, seed):
     
-    model = init_model_lenet5(device=device)
-    model, train_losses, val_losses = initial_training(model, 
-                                                       train_loader, 
-                                                       val_loader, 
-                                                       train_percentage=train_percentage, 
-                                                       num_epochs=3, 
-                                                       lr=0.9)
+    
+    # Obter x_train, y_train, x_val, y_val, x_test, y_test
+    x_train, y_train = extract_data(train_loader)
+    x_val, y_val = extract_data(val_loader)
+    x_test, y_test = extract_data(test_loader)
 
+    x_train_labeled = []
+    y_train_labeled = []
+
+
+    x_init_train, x_rest_train, y_init_train, y_rest_train = train_test_split(x_train, y_train, train_size=INIT_TRAINING_PERCENTAGE, stratify=y_train, random_state=seed)
+
+    print_distribuition(x_init_train, y_init_train, x_rest_train, y_rest_train, x_val, y_val, x_test, y_test)
+
+    model = init_model_lenet5(device=device, epochs=INIT_TRAINING_EPHOCHS, lr=INIT_LEARNING_RATE, batch_size=64)
     learner = ActiveLearner(
         estimator = model,
-        query_strategy=uncertainty_sampling  # Using uncertainty sampling as the query strategy
+        query_strategy=QUERY_STRATEGY,  # Using uncertainty sampling as the query strategy
+        X_training=x_init_train, y_training=y_init_train
     )
+    #CREATE RESULTS DIR
+    results_path = create_results_dir(seed) 
+    results_file_name = f"results_{seed}.csv"
+    init_results = learner.estimator.evaluate(x_val, y_val)    
+    write_metrics_to_csv(csv_path=results_path, csv_name=results_file_name, cycle=0, 
+                         oracle_label=-1, ground_truth_label=-1, metrics=init_results)
+    
+    
 
-    evaluate_model(learner.estimator, test_loader, device)
-    #for cycle in range(NUM_CYCLES):
-        #print(f"  Cycle {cycle + 1}/{num_cycles}")
+    for cycle in range(NUM_CYCLES):
+        print(f"Cycle {cycle + 1}/{NUM_CYCLES}")
 
-        # Step 1: Query the most uncertain sample using uncertainty sampling
-        #query_idx, query_instance = learner.query(train_set.data.numpy())  # Query the most informative sample(s)
+        # Query da amostra mais incerta 
+        query_idx, query_instance = learner.query(x_rest_train)
+        
+        # Obter imagem e ground truth
+        query_image = x_rest_train[query_idx]
+        true_label = y_rest_train[query_idx]
+        
+       # Verifique as classes antes da remoção
+        print("y_train antes da remoção:", Counter(y_rest_train))
 
-        # Step 2: Use the annotator_query() to get the correct label for the queried sample
-        #query_image = query_instance[0]  # If querying more than one sample, adjust accordingly
-        #query_label = annotator_query(query_image)  # Get the true label from the oracle
+        oracle_label = annotator_query(query_image, seed)
 
-        # Step 3: Teach the learner with the labeled sample
-        #learner.teach(X=query_instance, y=torch.tensor([query_label]))  # Train the model with the new labeled sample
+        learner.teach(X=query_image, y=torch.tensor([oracle_label]))
 
-        # Optionally: For debugging, show the image and its label
-        #print(f"   Queried image index: {query_idx}, Label: {query_label}")
+        # Remover amostra consultada do conjunto de treino e adicionar aos conjuntos rotulados
+        x_rest_train = np.delete(x_rest_train, query_idx, axis=0)
+        y_rest_train = np.delete(y_rest_train, query_idx, axis=0)
+
+        # Adicionar a amostra rotulada ao conjunto de treino rotulado
+        x_train_labeled.append(query_image)
+        y_train_labeled.append(true_label)
+
+        print("y_train antes da remoção:", Counter(y_rest_train))
+
+        if(cycle + 1 == NUM_CYCLES):
+            metrics = learner.estimator.evaluate(x_test, y_test)    
+        else:
+            metrics = learner.estimator.evaluate(x_val, y_val)    
+
+        write_metrics_to_csv(csv_path=results_path, csv_name=results_file_name, 
+                             cycle=cycle, oracle_label=oracle_label, ground_truth_label=true_label.item(), metrics=metrics)
+    
+
+
+    print("DONE! for seed: ", seed)
+
+
 
 
 # Main function to set up the environment
@@ -143,14 +219,11 @@ def main():
     test_data = filter_classes(test_data, classes=CLASSES)
     
     full_dataset = ConcatDataset([train_data, test_data])
-    plot_sample_images(full_dataset, classes=CLASSES, num_samples=6)
-
-    # Adicionar ruído aos dados para dificultar o aprendizado
+    #plot_sample_images(full_dataset, classes=CLASSES, num_samples=6)
     noisy_dataset = add_noise_to_data(full_dataset, noise_factor=DATA_AUG_NOISE_FACTOR)
-    plot_sample_images(noisy_dataset, classes=CLASSES, num_samples=6)
-
+    #plot_sample_images(noisy_dataset, classes=CLASSES, num_samples=6)
     rotated_noisy_dataset = add_bidirectional_rotation(noisy_dataset, angle=25)
-    plot_sample_images(rotated_noisy_dataset, classes=CLASSES, num_samples=6)
+    #plot_sample_images(rotated_noisy_dataset, classes=CLASSES, num_samples=6)
 
 
     full_dataset = ConcatDataset([full_dataset, noisy_dataset, rotated_noisy_dataset])  # Junta o dataset original com os dados "noisy"
@@ -163,11 +236,6 @@ def main():
 
     train_set, test_set, val_set = random_split(full_dataset, [train_size, test_size, val_size])
 
-    # DataLoaders
-    train_loader = DataLoader(train_set, batch_size=64, shuffle=True)
-    val_loader = DataLoader(val_set, batch_size=64, shuffle=False)
-    test_loader = DataLoader(test_set, batch_size=64, shuffle=False)
-    
     # Obter distribuições
     train_dist = get_label_distribution(train_set)
     val_dist = get_label_distribution(val_set)
@@ -175,14 +243,15 @@ def main():
     
     
     print(f"Train, Val, Tes distribution: {train_dist}, {val_dist}, {test_dist}")
-    # Plotar com múltiplas cores por barra
-    
     plot_distribution(train_dist, "Train", colors=CLASS_COLORS)
     plot_distribution(val_dist, "Validation", colors=CLASS_COLORS)
     plot_distribution(test_dist, "Test", colors=CLASS_COLORS)
 
-    init_active_learning(train_set=train_set, test_set=test_set, val_set=val_set,
-                         train_percentage=INIT_TRAINING_PERCENTAGE, seed=0)
+
+    train_loader = DataLoader(train_set, batch_size=64, shuffle=True)
+    val_loader = DataLoader(val_set, batch_size=64, shuffle=False)
+    test_loader = DataLoader(test_set, batch_size=64, shuffle=False)
+    init_active_learning(train_loader=train_loader, val_loader=val_loader, test_loader=test_loader, seed=0)
 
 if __name__ == "__main__":
     main() 
