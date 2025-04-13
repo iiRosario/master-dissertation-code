@@ -216,7 +216,76 @@ def plot_metric_over_cycles(csv_path, plot_path, variable, filename):
 
 
 
+def plot_all_metrics_over_cycles(csv_path, plot_path, seed):
+    plot_metric_over_cycles(csv_path=csv_path, 
+                            plot_path=plot_path, 
+                            variable="accuracy_per_class",
+                            filename=f"accuracy_{seed}")
+    
+    plot_metric_over_cycles(csv_path=csv_path, 
+                            plot_path=plot_path, 
+                            variable="precision_per_class",
+                            filename=f"accuracy_{seed}")
 
+
+
+
+def after_run_plot_metric(csv_folder, plot_path, variable, filename):
+    all_metrics = {}
+
+    # Ler todos os CSVs da pasta
+    for csv_file in os.listdir(csv_folder):
+        if csv_file.endswith(".csv"):
+            csv_path = os.path.join(csv_folder, csv_file)
+            df = pd.read_csv(csv_path)
+
+            # Converter a coluna da métrica de string para lista
+            def parse_list(row):
+                return [float(x) for x in row.strip("[]").replace("'", "").split(',')]
+
+            df[variable] = df[variable].apply(parse_list)
+
+            # Agregar métricas por ciclo
+            for _, row in df.iterrows():
+                cycle = int(row['cycle'])
+                values = row[variable]
+
+                if cycle not in all_metrics:
+                    all_metrics[cycle] = []
+                all_metrics[cycle].extend(values)
+
+    # Ordenar ciclos e calcular média + std
+    sorted_cycles = sorted(all_metrics.keys())
+    avg_per_cycle = [np.mean(all_metrics[cycle]) for cycle in sorted_cycles]
+    std_per_cycle = [np.std(all_metrics[cycle]) for cycle in sorted_cycles]
+
+    # Plot
+    plt.figure(figsize=(10, 6))
+    plt.plot(sorted_cycles, avg_per_cycle, label=f'Average {variable}', color='blue')
+    plt.fill_between(
+        sorted_cycles,
+        np.array(avg_per_cycle) - np.array(std_per_cycle),
+        np.array(avg_per_cycle) + np.array(std_per_cycle),
+        color='blue',
+        alpha=0.2,
+        label='±1 STD'
+    )
+
+    ax = plt.gca()
+    ax.xaxis.set_major_locator(MaxNLocator(integer=True))
+
+    plt.title(f'Average {variable.replace("_", " ").title()} over Active Learning Cycles')
+    plt.xlabel('Cycle')
+    plt.ylabel(variable.replace("_", " ").title())
+    plt.legend()
+    plt.grid(True)
+
+    os.makedirs(plot_path, exist_ok=True)
+    plot_file = os.path.join(plot_path, f'{filename}.png')
+    plt.savefig(plot_file)
+    plt.close()
+
+    print(f"Plot saved to: {plot_file}")
 
 
 ############################### DATA AUGMENTATION ###############################

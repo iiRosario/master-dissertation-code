@@ -153,6 +153,12 @@ def init_active_learning(train_loader, val_loader, test_loader, seed):
                             plot_path=results_path, 
                             variable="accuracy_per_class",
                             filename=f"precision_{seed}")
+    
+    plot_all_metrics_over_cycles(csv_path=os.path.join(results_path, results_file_name), 
+                                plot_path=results_path, 
+                                seed=seed)
+
+
     print("DONE! for seed: ", seed)
 
 
@@ -215,6 +221,9 @@ def main():
     for seed in range(30):
         print(f"\n\n\n========== AL =============")
         print(f"Running on seed: {seed}")
+        print(f"Learning Rate: {INIT_LEARNING_RATE}")
+        print(f"Init training (%): {INIT_TRAINING_PERCENTAGE * 100}%")
+        
         # Inicializar o modelo e o ciclo de aprendizado ativo
         init_active_learning(train_loader=train_loader, val_loader=val_loader, test_loader=test_loader, seed=seed)
 
