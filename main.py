@@ -240,12 +240,10 @@ def main():
     val_dist = get_label_distribution(val_set)
     test_dist = get_label_distribution(test_set)
     
-    
     print(f"Train, Val, Tes distribution: {train_dist}, {val_dist}, {test_dist}")
     plot_distribution(train_dist, "Train", colors=CLASS_COLORS)
     plot_distribution(val_dist, "Validation", colors=CLASS_COLORS)
     plot_distribution(test_dist, "Test", colors=CLASS_COLORS)
-
 
     train_loader = DataLoader(train_set, batch_size=64, shuffle=True)
     val_loader = DataLoader(val_set, batch_size=64, shuffle=True)
