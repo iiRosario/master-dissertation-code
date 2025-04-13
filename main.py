@@ -20,21 +20,11 @@ import shutil
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print("Using device:", device)
 
-def print_distribuition(x_init_train, y_init_train, x_rest_train, y_rest_train, x_val, y_val, x_test, y_test):
+def print_distribuition(x, y):
 
-    y_init_train_numpy = y_init_train.numpy() if isinstance(y_init_train, torch.Tensor) else y_init_train
-    y_rest_train_numpy = y_rest_train.numpy() if isinstance(y_rest_train, torch.Tensor) else y_rest_train
-
-
-    #y_test = y_test.numpy() if isinstance(y_test, torch.Tensor) else y_test
-    
-    print(f"x_init_train: {len(x_init_train)}, y_init_train:", Counter(y_init_train_numpy))
-    print(f"x_rest_train: {len(x_rest_train)}, y_rest_train:", Counter(y_rest_train_numpy))
-    
-    
-    #print("x_test: ", len(x_test))
-    #print("Distribuição em y_test:", Counter(y_test))
-
+    y = y.numpy() if isinstance(y, torch.Tensor) else y
+    print(f"x_init_train: {len(x)}, y_init_train:", Counter(y))
+   
 def create_results_dir(seed):
     if QUERY_STRATEGY == margin_sampling:
         results_dir_name = f"results_margin_sampling_{seed}"
@@ -137,13 +127,22 @@ def init_active_learning(train_loader, val_loader, test_loader, seed):
     x_val, y_val = extract_data(val_loader)
     x_test, y_test = extract_data(test_loader)
 
+    #VERIFICAR SE O DATASET DE TRAIN EStá SHUFFLED
+    torch.manual_seed(seed)  
+    indices = torch.randperm(len(x_train))  # Shuffle reprodutível
+    x_train = x_train[indices]
+    y_train = y_train[indices]
+
+    x_init_train, x_rest_train, y_init_train, y_rest_train = train_test_split(x_train, y_train, train_size=INIT_TRAINING_PERCENTAGE, stratify=y_train, random_state=seed)
+
     x_train_labeled = []
     y_train_labeled = []
 
 
-    x_init_train, x_rest_train, y_init_train, y_rest_train = train_test_split(x_train, y_train, train_size=INIT_TRAINING_PERCENTAGE, stratify=y_train, random_state=seed)
-
-    print_distribuition(x_init_train, y_init_train, x_rest_train, y_rest_train, x_val, y_val, x_test, y_test)
+    torch.manual_seed(seed)  
+    indices = torch.randperm(len(x_init_train))  # Shuffle reprodutível
+    x_init_train = x_init_train[indices]
+    y_init_train = y_init_train[indices]
 
     model = init_model_lenet5(device=device, epochs=INIT_TRAINING_EPHOCHS, lr=INIT_LEARNING_RATE, batch_size=64)
     learner = ActiveLearner(
@@ -158,9 +157,9 @@ def init_active_learning(train_loader, val_loader, test_loader, seed):
     write_metrics_to_csv(csv_path=results_path, csv_name=results_file_name, cycle=0, 
                          oracle_label=-1, ground_truth_label=-1, metrics=init_results)
     
-    
 
     for cycle in range(NUM_CYCLES):
+        print("==========================")
         print(f"Cycle {cycle + 1}/{NUM_CYCLES}")
 
         # Query da amostra mais incerta 
@@ -169,11 +168,9 @@ def init_active_learning(train_loader, val_loader, test_loader, seed):
         # Obter imagem e ground truth
         query_image = x_rest_train[query_idx]
         true_label = y_rest_train[query_idx]
-        
-       # Verifique as classes antes da remoção
-        print("y_train antes da remoção:", Counter(y_rest_train))
-
+    
         oracle_label = annotator_query(query_image, seed)
+        #oracle_label = true_label.item()
 
         learner.teach(X=query_image, y=torch.tensor([oracle_label]))
 
@@ -185,19 +182,21 @@ def init_active_learning(train_loader, val_loader, test_loader, seed):
         x_train_labeled.append(query_image)
         y_train_labeled.append(true_label)
 
-        print("y_train antes da remoção:", Counter(y_rest_train))
-
         if(cycle + 1 == NUM_CYCLES):
             metrics = learner.estimator.evaluate(x_test, y_test)    
         else:
             metrics = learner.estimator.evaluate(x_val, y_val)    
 
         write_metrics_to_csv(csv_path=results_path, csv_name=results_file_name, 
-                             cycle=cycle, oracle_label=oracle_label, ground_truth_label=true_label.item(), metrics=metrics)
+                             cycle=cycle+1, oracle_label=oracle_label, ground_truth_label=true_label.item(), metrics=metrics)
     
 
-
+    plot_metric_over_cycles(csv_path=os.path.join(results_path, results_file_name), 
+                            plot_path=results_path, 
+                            variable="accuracy_per_class",
+                            filename=f"precision_{seed}")
     print("DONE! for seed: ", seed)
+
 
 
 
@@ -249,8 +248,8 @@ def main():
 
 
     train_loader = DataLoader(train_set, batch_size=64, shuffle=True)
-    val_loader = DataLoader(val_set, batch_size=64, shuffle=False)
-    test_loader = DataLoader(test_set, batch_size=64, shuffle=False)
+    val_loader = DataLoader(val_set, batch_size=64, shuffle=True)
+    test_loader = DataLoader(test_set, batch_size=64, shuffle=True)
     init_active_learning(train_loader=train_loader, val_loader=val_loader, test_loader=test_loader, seed=0)
 
 if __name__ == "__main__":

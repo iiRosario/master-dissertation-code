@@ -12,33 +12,41 @@ from sklearn.metrics import (
 from sklearn.preprocessing import label_binarize
 from env import *
 
-# LeNet-5 com Dropout e complexidade reduzida
 class LeNet5(nn.Module):
     def __init__(self, device='cpu', epochs=INIT_TRAINING_EPHOCHS, lr=INIT_LEARNING_RATE, batch_size=64):
         super(LeNet5, self).__init__()
-        self.device = device  # Configura o dispositivo (CPU ou GPU)
+        self.device = device
         self.epochs = epochs
         self.lr = lr
         self.batch_size = batch_size
-        # Diminuir o número de filtros na primeira camada convolucional
-        self.conv1 = nn.Conv2d(1, 4, kernel_size=5)  # Menos filtros
+        
+        # Reduzindo a capacidade:
+        # Agora, conv1 tem 2 filtros e conv2 tem 4 filtros.
+        self.conv1 = nn.Conv2d(1, 2, kernel_size=5)
         self.pool = nn.AvgPool2d(2, 2)
-        self.conv2 = nn.Conv2d(4, 8, kernel_size=5)  # Menos filtros
-
-        self.fc1 = nn.Linear(8 * 4 * 4, 60)  # Menos neurônios
-        self.fc2 = nn.Linear(60, 40)         # Menos neurônios
-        self.fc3 = nn.Linear(40, 10)         # 10 classes no FashionMNIST
-
-        self.dropout1 = nn.Dropout(p=0.5)    # Maior dropout
-        self.dropout2 = nn.Dropout(p=0.5)    # Maior dropout
-
-        # Movendo o modelo para o dispositivo
+        self.conv2 = nn.Conv2d(2, 4, kernel_size=5)
+        
+        # Cálculo do tamanho de entrada da primeira camada FC:
+        # Com imagens 28x28:
+        # Após conv1 (kernel=5): 28-5+1 = 24 -> tamanho 24x24, e após pool: 12x12.
+        # Após conv2 (kernel=5): 12-5+1 = 8 -> tamanho 8x8, e após pool: 4x4.
+        # Com 4 filtros, a saída é 4 * 4 * 4 = 64.
+        self.fc1 = nn.Linear(4 * 4 * 4, 30)  # Reduzido
+        self.fc2 = nn.Linear(30, 20)         # Reduzido
+        self.fc3 = nn.Linear(20, 10)         # 10 classes no FashionMNIST
+        
+        # Aumentando o dropout para ajudar a desacelerar o aprendizado
+        self.dropout1 = nn.Dropout(p=0.6)
+        self.dropout2 = nn.Dropout(p=0.6)
+        
+        # Mover o modelo para o dispositivo configurado
         self.to(self.device)
 
     def forward(self, x):
+        # Aplicando as camadas com tanh e pooling
         x = self.pool(torch.tanh(self.conv1(x)))
         x = self.pool(torch.tanh(self.conv2(x)))
-        x = x.view(-1, 8 * 4 * 4)
+        x = x.view(x.size(0), -1)  # Achatar o tensor para a camada FC
         x = self.dropout1(torch.tanh(self.fc1(x)))
         x = self.dropout2(torch.tanh(self.fc2(x)))
         x = self.fc3(x)
@@ -48,7 +56,7 @@ class LeNet5(nn.Module):
     def fit(self, X, y):
         self.train()
         criterion = nn.CrossEntropyLoss()
-        optimizer = torch.optim.Adam(self.parameters(), lr=self.lr, weight_decay=1e-4)
+        optimizer = torch.optim.Adam(self.parameters(), lr=self.lr, weight_decay=1e-3)
 
         if isinstance(X, np.ndarray):
             X_tensor = torch.from_numpy(X).float()
@@ -142,7 +150,7 @@ class LeNet5(nn.Module):
 
         # DataLoader temporário
         dataset = TensorDataset(X_tensor, y_tensor)
-        dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False)
+        dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
 
         all_preds = []
         all_labels = []
@@ -162,13 +170,15 @@ class LeNet5(nn.Module):
         all_preds = np.array(all_preds)
         all_labels = np.array(all_labels)
 
-        # Métricas por classe
-        precision_per_class = precision_score(all_labels, all_preds, average=None, zero_division=0).tolist()
-        recall_per_class = recall_score(all_labels, all_preds, average=None, zero_division=0).tolist()
-        f1_per_class = f1_score(all_labels, all_preds, average=None, zero_division=0).tolist()
+        classes = sorted(np.unique(y_tensor.cpu().numpy()))  # ou simplesmente classes = [0, 1, 2] se souberes de antemão
 
-        # Confusion Matrix
-        cm = confusion_matrix(all_labels, all_preds)
+        # Métricas por classe (corrigido)
+        precision_per_class = precision_score(all_labels, all_preds, average=None, zero_division=0, labels=classes).tolist()
+        recall_per_class = recall_score(all_labels, all_preds, average=None, zero_division=0, labels=classes).tolist()
+        f1_per_class = f1_score(all_labels, all_preds, average=None, zero_division=0, labels=classes).tolist()
+
+        # Confusion Matrix (corrigido)
+        cm = confusion_matrix(all_labels, all_preds, labels=classes)
 
         # Accuracy por classe
         acc_per_class = []

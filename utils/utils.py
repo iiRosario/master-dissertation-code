@@ -5,7 +5,10 @@ from torch.utils.data import Subset
 from collections import Counter
 from env import *
 import csv
+import pandas as pd
 from torchvision.transforms import functional as F
+from matplotlib.ticker import MaxNLocator
+
 
 def get_label_distribution(dataset):
     labels = [dataset[i][1] for i in range(len(dataset))]
@@ -116,6 +119,60 @@ def write_metrics_to_csv(csv_path, csv_name, cycle, oracle_label, ground_truth_l
         })
 
     
+
+
+
+
+
+
+
+# ============================= PLOTAR MÉTRICAS ============================
+def plot_metric_over_cycles(csv_path, plot_path, variable, filename):
+    df = pd.read_csv(csv_path)
+
+    # Converter strings da coluna para listas de float
+    def parse_list(row):
+        return [float(x) for x in row.strip("[]").replace("'", "").split(',')]
+
+    df[variable] = df[variable].apply(parse_list)
+
+    # Calcular média e std da métrica por ciclo
+    df['mean'] = df[variable].apply(np.mean)
+    df['std'] = df[variable].apply(np.std)
+
+    cycles = df['cycle']
+    means = df['mean']
+    stds = df['std']
+
+    # Plotar
+    plt.figure(figsize=(10, 6))
+    plt.plot(cycles, means, label=f'Average {variable}', color='blue')
+    plt.fill_between(cycles, means - stds, means + stds, color='blue', alpha=0.2, label='±1 STD')
+
+    # Forçar eixo X com valores inteiros
+    ax = plt.gca()
+    ax.xaxis.set_major_locator(MaxNLocator(integer=True))
+
+    # Ajustar eixos e título
+    plt.title(f'{variable.replace("_", " ").title()} over Active Learning Cycles')
+    plt.xlabel('Cycle')
+    plt.ylabel(variable.replace("_", " ").title())
+    plt.legend()
+    plt.grid(True)
+
+    # Garantir que o diretório de destino existe
+    os.makedirs(plot_path, exist_ok=True)
+
+    # Salvar figura
+    plot_file = os.path.join(plot_path, f'{filename}.png')
+    plt.savefig(plot_file)
+    plt.close()
+
+    print(f"Plot saved to: {plot_file}")
+
+
+
+
 
 
 ############################### DATA AUGMENTATION ###############################

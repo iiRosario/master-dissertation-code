@@ -15,9 +15,9 @@ DATA_AUG_NOISE_FACTOR = 0.5
 
 
 ### LEARNER CONFIGURATION ###
-INIT_TRAINING_PERCENTAGE = 0.1
-INIT_TRAINING_EPHOCHS = 2
-INIT_LEARNING_RATE = 0.9
+INIT_TRAINING_PERCENTAGE = 0.05
+INIT_TRAINING_EPHOCHS = 1
+INIT_LEARNING_RATE = 0.1
 
 QUERY_STRATEGY = uncertainty_sampling 
 #QUERY_STRATEGY = "margin_sampling"  # "uncertainty_sampling" or "random_sampling"
@@ -29,7 +29,7 @@ MODELS= os.path.join(BASE_DIR, "models")
 
 
 ## Active Learning Configuration
-NUM_CYCLES = 300
+NUM_CYCLES = 20
 NUM_ANNOTATORS = 30
 
 DATA_DIR = "data"
