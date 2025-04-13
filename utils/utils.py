@@ -198,8 +198,8 @@ def plot_metric_over_cycles(csv_path, plot_path, variable, filename):
     ax.xaxis.set_major_locator(MaxNLocator(integer=True))
 
     # Ajustar eixos e título
-    plt.title(f'{variable.replace("_", " ").title()} over Active Learning Cycles')
-    plt.xlabel('Cycle')
+    plt.title(f'{variable.replace("_", " ").title()} over AL Iterations')
+    plt.xlabel('Iteration')
     plt.ylabel(variable.replace("_", " ").title())
     plt.legend()
     plt.grid(True)
@@ -225,8 +225,7 @@ def plot_all_metrics_over_cycles(csv_path, plot_path, seed):
     plot_metric_over_cycles(csv_path=csv_path, 
                             plot_path=plot_path, 
                             variable="precision_per_class",
-                            filename=f"accuracy_{seed}")
-
+                            filename=f"precision_{seed}")
 
 
 

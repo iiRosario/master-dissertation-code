@@ -29,19 +29,13 @@ def print_distribuition(x, y):
    
 def create_results_dir(seed):
     if QUERY_STRATEGY == margin_sampling:
-        results_dir_name = f"results_margin_sampling_{seed}"
+        results_dir_name = f"margin_sampling_{seed}"
     elif QUERY_STRATEGY == entropy_sampling:
-        results_dir_name = f"results_entropy_sampling_{seed}"
+        results_dir_name = f"entropy_sampling_{seed}"
     else:
-        results_dir_name = f"results_uncertainty_sampling_{seed}"
+        results_dir_name = f"uncertainty_sampling"
     
     results_dir_path = os.path.join(RESULTS_PATH, ORACLE_ANSWER, results_dir_name)
-
-    # Remove a pasta se ela já existir
-    if os.path.exists(results_dir_path):
-        shutil.rmtree(results_dir_path)
-
-    # Cria a nova pasta
     os.makedirs(results_dir_path, exist_ok=True)
     
     return results_dir_path
@@ -70,14 +64,12 @@ def init_model_shallow_net(device=device, epochs=INIT_TRAINING_EPHOCHS, lr=INIT_
 
 # Active learning loop
 def init_active_learning(train_loader, val_loader, test_loader, seed):
-    
-    
+
     # Obter x_train, y_train, x_val, y_val, x_test, y_test
     x_train, y_train = extract_data(train_loader)
     x_val, y_val = extract_data(val_loader)
     x_test, y_test = extract_data(test_loader)
 
-    #VERIFICAR SE O DATASET DE TRAIN EStá SHUFFLED
     torch.manual_seed(seed)  
     indices = torch.randperm(len(x_train))  # Shuffle reprodutível
     x_train = x_train[indices]
@@ -87,7 +79,6 @@ def init_active_learning(train_loader, val_loader, test_loader, seed):
 
     x_train_labeled = []
     y_train_labeled = []
-
 
     torch.manual_seed(seed)  
     indices = torch.randperm(len(x_init_train))  # Shuffle reprodutível
@@ -103,9 +94,10 @@ def init_active_learning(train_loader, val_loader, test_loader, seed):
     #CREATE RESULTS DIR
     results_path = create_results_dir(seed) 
     results_file_name = f"results_{seed}.csv"
+    results_csv_path = os.path.join(results_path, results_file_name)
+    if os.path.exists(results_csv_path): os.remove(results_csv_path)
     init_results = learner.estimator.evaluate(x_val, y_val)    
-    write_metrics_to_csv(csv_path=results_path, csv_name=results_file_name, cycle=0, 
-                         oracle_label=-1, ground_truth_label=-1, metrics=init_results)
+    write_metrics_to_csv(csv_path=results_path, csv_name=results_file_name, cycle=0, oracle_label=-1, ground_truth_label=-1, metrics=init_results)
     
 
     oracle = Committee(annotators=[], seed=seed)
@@ -148,15 +140,13 @@ def init_active_learning(train_loader, val_loader, test_loader, seed):
         write_metrics_to_csv(csv_path=results_path, csv_name=results_file_name, 
                              cycle=cycle+1, oracle_label=oracle_label, ground_truth_label=true_label.item(), metrics=metrics)
     
-
-    plot_metric_over_cycles(csv_path=os.path.join(results_path, results_file_name), 
-                            plot_path=results_path, 
-                            variable="accuracy_per_class",
-                            filename=f"precision_{seed}")
     
-    plot_all_metrics_over_cycles(csv_path=os.path.join(results_path, results_file_name), 
-                                plot_path=results_path, 
-                                seed=seed)
+    plots_path = os.path.join(results_path, "plots")
+    csv_path = os.path.join(results_path, results_file_name)
+    os.makedirs(plots_path, exist_ok=True)
+    plot_metric_over_cycles(csv_path=csv_path, plot_path=plots_path, variable="accuracy_per_class", filename=f"precision_{seed}")
+    
+    plot_all_metrics_over_cycles(csv_path=csv_path, plot_path=plots_path, seed=seed)
 
 
     print("DONE! for seed: ", seed)
@@ -193,7 +183,6 @@ def main():
     rotated_noisy_dataset = add_bidirectional_rotation(noisy_dataset, angle=25)
     #plot_sample_images(rotated_noisy_dataset, classes=CLASSES, num_samples=6)
 
-
     full_dataset = ConcatDataset([full_dataset, noisy_dataset, rotated_noisy_dataset])  # Junta o dataset original com os dados "noisy"
 
     # Cálculo das proporções: 70% treino, 20% teste, 10% validação
@@ -223,6 +212,7 @@ def main():
         print(f"Running on seed: {seed}")
         print(f"Learning Rate: {INIT_LEARNING_RATE}")
         print(f"Init training (%): {INIT_TRAINING_PERCENTAGE * 100}%")
+        print(f"Running on seed: {seed}")
         
         # Inicializar o modelo e o ciclo de aprendizado ativo
         init_active_learning(train_loader=train_loader, val_loader=val_loader, test_loader=test_loader, seed=seed)
