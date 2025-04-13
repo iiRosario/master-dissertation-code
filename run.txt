@@ -1,0 +1,2 @@
+/home/diogorosariocrai/miniconda3/envs/active_learning_env/python.exe main.py
+
