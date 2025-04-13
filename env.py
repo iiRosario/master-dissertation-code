@@ -17,7 +17,7 @@ DATA_AUG_NOISE_FACTOR = 0.5
 ### LEARNER CONFIGURATION ###
 INIT_TRAINING_PERCENTAGE = 0.05
 INIT_TRAINING_EPHOCHS = 1
-INIT_LEARNING_RATE = 0.1
+INIT_LEARNING_RATE = 0.2
 
 QUERY_STRATEGY = uncertainty_sampling 
 #QUERY_STRATEGY = "margin_sampling"  # "uncertainty_sampling" or "random_sampling"
