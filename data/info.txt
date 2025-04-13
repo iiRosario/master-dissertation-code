@@ -1,0 +1,80 @@
+person: 66808 images, 273469 annotations
+bicycle: 3401 images, 7429 annotations
+car: 12786 images, 45799 annotations
+motorcycle: 3661 images, 9096 annotations
+airplane: 3083 images, 5278 annotations
+bus: 4141 images, 6354 annotations
+train: 3745 images, 4761 annotations
+truck: 6377 images, 10388 annotations
+boat: 3146 images, 11189 annotations
+traffic light: 4330 images, 13521 annotations
+fire hydrant: 1797 images, 1966 annotations
+stop sign: 1803 images, 2058 annotations
+parking meter: 742 images, 1345 annotations
+bench: 5805 images, 10251 annotations
+bird: 3362 images, 11246 annotations
+cat: 4298 images, 4970 annotations
+dog: 4562 images, 5726 annotations
+horse: 3069 images, 6860 annotations
+sheep: 1594 images, 9870 annotations
+cow: 2055 images, 8527 annotations
+elephant: 2232 images, 5768 annotations
+bear: 1009 images, 1365 annotations
+zebra: 2001 images, 5571 annotations
+giraffe: 2647 images, 5363 annotations
+backpack: 5756 images, 9091 annotations
+umbrella: 4142 images, 11844 annotations
+handbag: 7133 images, 12894 annotations
+tie: 3955 images, 6750 annotations
+suitcase: 2507 images, 6495 annotations
+frisbee: 2268 images, 2797 annotations
+skis: 3202 images, 6887 annotations
+snowboard: 1703 images, 2754 annotations
+sports ball: 4431 images, 6610 annotations
+kite: 2352 images, 9412 annotations
+baseball bat: 2603 images, 3422 annotations
+baseball glove: 2729 images, 3895 annotations
+skateboard: 3603 images, 5722 annotations
+surfboard: 3635 images, 6395 annotations
+tennis racket: 3561 images, 5037 annotations
+bottle: 8880 images, 25367 annotations
+wine glass: 2643 images, 8256 annotations
+cup: 9579 images, 21549 annotations
+fork: 3710 images, 5694 annotations
+knife: 4507 images, 8096 annotations
+spoon: 3682 images, 6418 annotations
+bowl: 7425 images, 14984 annotations
+banana: 2346 images, 9837 annotations
+apple: 1662 images, 6090 annotations
+sandwich: 2463 images, 4550 annotations
+orange: 1784 images, 6686 annotations
+broccoli: 2010 images, 7624 annotations
+carrot: 1764 images, 8223 annotations
+hot dog: 1273 images, 3045 annotations
+pizza: 3319 images, 6106 annotations
+donut: 1585 images, 7517 annotations
+cake: 3049 images, 6669 annotations
+chair: 13354 images, 40282 annotations
+couch: 4618 images, 6040 annotations
+potted plant: 4624 images, 8995 annotations
+bed: 3831 images, 4355 annotations
+dining table: 12338 images, 16411 annotations
+toilet: 3502 images, 4336 annotations
+tv: 4768 images, 6093 annotations
+laptop: 3707 images, 5201 annotations
+mouse: 1964 images, 2368 annotations
+remote: 3221 images, 5986 annotations
+keyboard: 2221 images, 3008 annotations
+cell phone: 5017 images, 6696 annotations
+microwave: 1601 images, 1728 annotations
+oven: 2992 images, 3477 annotations
+toaster: 225 images, 234 annotations
+sink: 4865 images, 5835 annotations
+refrigerator: 2461 images, 2763 annotations
+book: 5562 images, 25876 annotations
+clock: 4863 images, 6601 annotations
+vase: 3730 images, 6890 annotations
+scissors: 975 images, 1517 annotations
+teddy bear: 2234 images, 4984 annotations
+hair drier: 198 images, 209 annotations
+toothbrush: 1041 images, 2011 annotations
