@@ -45,7 +45,7 @@ dependencies:
       - markupsafe==3.0.2
       - matplotlib==3.10.1
       - mdurl==0.1.2
-      - modal-python==0.4.2
+      - modal-python==0.4.2.1
       - mpmath==1.3.0
       - multidict==6.2.0
       - networkx==3.4.2
