@@ -17,7 +17,9 @@ from utils.utils import *
 from entities.ShallowNet import ShallowNet
 import shutil
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+#device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+device = "cpu"
+
 print("Using device:", device)
 
 def print_distribuition(x, y):
