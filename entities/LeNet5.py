@@ -13,47 +13,48 @@ from sklearn.preprocessing import label_binarize
 from env import *
 
 class LeNet5(nn.Module):
-    def __init__(self, device='cpu', epochs=INIT_TRAINING_EPHOCHS, lr=INIT_LEARNING_RATE, batch_size=64):
+    def __init__(self, device='cpu', epochs=INIT_TRAINING_EPHOCHS, lr=INIT_LEARNING_RATE, batch_size=64 ):
         super(LeNet5, self).__init__()
         self.device = device
         self.epochs = epochs
         self.lr = lr
         self.batch_size = batch_size
-        
-        # Reduzindo a capacidade:
-        # Agora, conv1 tem 2 filtros e conv2 tem 4 filtros.
-        self.conv1 = nn.Conv2d(1, 2, kernel_size=5)
+
+        in_channels = 3 if IS_CIFAR else 1
+
+        self.conv1 = nn.Conv2d(in_channels, 2, kernel_size=5)
         self.pool = nn.AvgPool2d(2, 2)
         self.conv2 = nn.Conv2d(2, 4, kernel_size=5)
-        
-        # Cálculo do tamanho de entrada da primeira camada FC:
-        # Com imagens 28x28:
-        # Após conv1 (kernel=5): 28-5+1 = 24 -> tamanho 24x24, e após pool: 12x12.
-        # Após conv2 (kernel=5): 12-5+1 = 8 -> tamanho 8x8, e após pool: 4x4.
-        # Com 4 filtros, a saída é 4 * 4 * 4 = 64.
-        self.fc1 = nn.Linear(4 * 4 * 4, 30)  # Reduzido
-        self.fc2 = nn.Linear(30, 20)         # Reduzido
-        self.fc3 = nn.Linear(20, 10)         # 10 classes no FashionMNIST
-        
-        # Aumentando o dropout para ajudar a desacelerar o aprendizado
+
+        if IS_CIFAR:
+            # CIFAR-10: 32x32 -> conv1: 28x28 -> pool: 14x14
+            # -> conv2: 10x10 -> pool: 5x5 → 4 filtros → 4*5*5 = 100
+            fc_input_size = 4 * 5 * 5
+        else:
+            # MNIST: 28x28 -> conv1: 24x24 -> pool: 12x12
+            # -> conv2: 8x8 -> pool: 4x4 → 4 filtros → 4*4*4 = 64
+            fc_input_size = 4 * 4 * 4
+
+        self.fc1 = nn.Linear(fc_input_size, 30)
+        self.fc2 = nn.Linear(30, 20)
+        self.fc3 = nn.Linear(20, len(CLASSES))  # Adapta dinamicamente às classes
+
         self.dropout1 = nn.Dropout(p=0.6)
         self.dropout2 = nn.Dropout(p=0.6)
-        
-        # Mover o modelo para o dispositivo configurado
+
         self.to(self.device)
 
     def forward(self, x):
-        # Aplicando as camadas com tanh e pooling
         x = self.pool(torch.tanh(self.conv1(x)))
         x = self.pool(torch.tanh(self.conv2(x)))
-        x = x.view(x.size(0), -1)  # Achatar o tensor para a camada FC
+        x = x.view(x.size(0), -1)
         x = self.dropout1(torch.tanh(self.fc1(x)))
         x = self.dropout2(torch.tanh(self.fc2(x)))
         x = self.fc3(x)
         return x
 
     # Função de treinamento (fit)
-    def fit(self, X, y):
+    """ def fit(self, X, y):
         self.train()
         criterion = nn.CrossEntropyLoss()
         optimizer = torch.optim.Adam(self.parameters(), lr=self.lr, weight_decay=1e-4)
@@ -64,8 +65,6 @@ class LeNet5(nn.Module):
             X_tensor = X.clone().detach().float()
         else:
             raise TypeError("Input X must be a numpy array or torch tensor")
-
-        y_numpy = y.numpy() if isinstance(y, torch.Tensor) else y
 
         if X_tensor.dim() == 3:
             X_tensor = X_tensor.unsqueeze(0)
@@ -100,6 +99,47 @@ class LeNet5(nn.Module):
             print(f"    Epoch [{epoch+1}/{self.epochs}] - Train Loss: {avg_train_loss:.4f}")
 
         return self
+     """
+
+    def fit(self, X, y):
+        self.train()
+        criterion = nn.CrossEntropyLoss()
+        optimizer = torch.optim.Adam(self.parameters(), lr=self.lr, weight_decay=1e-4)
+
+        if isinstance(X, torch.Tensor):
+            X_tensor = X.clone().detach().float()
+        else:
+            raise TypeError("Input X must be a torch tensor")
+
+        
+        if X_tensor.dim() != 4 and X_tensor.dim() != 3:
+             raise ValueError(f"Unexpected input shape: {X_tensor.shape}\nInput X must have at least 3 dimensions (C, H, W).")
+
+        if isinstance(y, torch.Tensor):
+            y_tensor = y.clone().detach().long()
+        else:
+            raise TypeError("Input y must be a torch tensor")
+
+
+        dataset = TensorDataset(X_tensor, y_tensor)
+        train_loader = DataLoader(dataset, batch_size=self.batch_size, shuffle=True)
+
+        for epoch in range(self.epochs):
+            running_loss = 0.0
+            for images, labels in train_loader:
+                images, labels = images.to(self.device), labels.to(self.device)
+                optimizer.zero_grad()
+                outputs = self(images)
+                loss = criterion(outputs, labels)
+                loss.backward()
+                optimizer.step()
+                running_loss += loss.item()
+
+            avg_train_loss = running_loss / len(train_loader)
+            print(f"    Epoch [{epoch+1}/{self.epochs}] - Train Loss: {avg_train_loss:.4f}")
+
+        return self
+
 
     # Função de previsão (predict)
     def predict(self, X):

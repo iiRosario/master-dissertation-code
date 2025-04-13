@@ -92,7 +92,7 @@ def init_active_learning(train_loader, val_loader, test_loader, seed):
     x_init_train = x_init_train[indices]
     y_init_train = y_init_train[indices]
 
-    model = init_model_shallow_net(device=device, epochs=INIT_TRAINING_EPHOCHS, lr=INIT_LEARNING_RATE, batch_size=64)
+    model = init_model_lenet5(device=device, epochs=INIT_TRAINING_EPHOCHS, lr=INIT_LEARNING_RATE, batch_size=64)
     learner = ActiveLearner(
         estimator = model,
         query_strategy=QUERY_STRATEGY,  # Using uncertainty sampling as the query strategy
@@ -166,17 +166,22 @@ def main():
     ])
 
     # Carregar e combinar FashionMNIST (train + test)
-    train_data = datasets.FashionMNIST(root='./data', train=True, download=True, transform=transform)
-    test_data = datasets.FashionMNIST(root='./data', train=False, download=True, transform=transform)
+    #train_data = datasets.FashionMNIST(root='./data', train=True, download=True, transform=transform)
+    #test_data = datasets.FashionMNIST(root='./data', train=False, download=True, transform=transform)
     
+    train_data = datasets.CIFAR10(root='./data', train=True, download=True, transform=transform)
+    test_data = datasets.CIFAR10(root='./data', train=False, download=True, transform=transform)
+
     # Filtrar as classes 0, 1 e 2
     train_data = filter_classes(train_data, classes=CLASSES)
     test_data = filter_classes(test_data, classes=CLASSES)
     
     full_dataset = ConcatDataset([train_data, test_data])
     #plot_sample_images(full_dataset, classes=CLASSES, num_samples=6)
+    
     noisy_dataset = add_noise_to_data(full_dataset, noise_factor=DATA_AUG_NOISE_FACTOR)
     #plot_sample_images(noisy_dataset, classes=CLASSES, num_samples=6)
+    
     rotated_noisy_dataset = add_bidirectional_rotation(noisy_dataset, angle=25)
     #plot_sample_images(rotated_noisy_dataset, classes=CLASSES, num_samples=6)
 
@@ -197,9 +202,9 @@ def main():
     test_dist = get_label_distribution(test_set)
     
     print(f"Train, Val, Tes distribution: {train_dist}, {val_dist}, {test_dist}")
-    plot_distribution(train_dist, "Train", colors=CLASS_COLORS)
-    plot_distribution(val_dist, "Validation", colors=CLASS_COLORS)
-    plot_distribution(test_dist, "Test", colors=CLASS_COLORS)
+    #plot_distribution(train_dist, "Train", colors=CLASS_COLORS)
+    #plot_distribution(val_dist, "Validation", colors=CLASS_COLORS)
+    #plot_distribution(test_dist, "Test", colors=CLASS_COLORS)
 
     train_loader = DataLoader(train_set, batch_size=64, shuffle=True)
     val_loader = DataLoader(val_set, batch_size=64, shuffle=True)

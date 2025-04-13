@@ -30,7 +30,25 @@ def plot_distribution(distribution, split_name, colors=['royalblue', 'tomato', '
     plt.close()
     print(f"Saved: {filename}")
 
-# Função para plotar 3 figuras do dataset para as classes 0, 1 e 2
+def plot_sample_images(dataset, classes, num_samples=6):
+    fig, axes = plt.subplots(1, num_samples, figsize=(15, 15))
+
+    for i in range(num_samples):
+        # Pega uma amostra aleatória do dataset
+        img, label = dataset[i]
+        
+        # Se a imagem for 3D (RGB), exibe diretamente
+        if img.ndimension() == 3:  # (C, H, W) para CIFAR
+            img = img.permute(1, 2, 0)  # Transforma para (H, W, C)
+
+        axes[i].imshow(img)  # Exibe a imagem
+        axes[i].axis('off')  # Desliga os eixos
+        axes[i].set_title(f"Class: {classes[label.item()]}")
+    
+    plt.tight_layout()
+    plt.show()
+
+""" # Função para plotar 3 figuras do dataset para as classes 0, 1 e 2
 def plot_sample_images(dataset, classes=[0, 1, 2], num_samples=3):
     # Mapear as classes numéricas para seus respectivos nomes no FashionMNIST
     class_names = ['T-shirt/top', 'Trouser', 'Pullover']  # Nomes das classes 0, 1, 2
@@ -60,8 +78,41 @@ def plot_sample_images(dataset, classes=[0, 1, 2], num_samples=3):
         axes[i, 0].set_ylabel(f"{class_names[cls]}", fontsize=14)
     
     plt.tight_layout()
-    plt.show()
+    plt.show() """
+def plot_sample_images(dataset, classes=[0, 1, 2], num_samples=3):
+    # Mapear as classes numéricas para seus respectivos nomes no FashionMNIST ou CIFAR-10
+    class_names = ['T-shirt/top', 'Trouser', 'Pullover']  # Para FashionMNIST (adaptar para CIFAR-10)
 
+    # Criar um dicionário para armazenar imagens de cada classe
+    class_images = {cls: [] for cls in classes}
+    
+    # Encontrar 'num_samples' imagens para cada classe
+    for img, label in dataset:
+        if label in classes and len(class_images[label]) < num_samples:
+            class_images[label].append(img)
+        
+        # Stop early if we have enough images for all classes
+        if all(len(class_images[cls]) >= num_samples for cls in classes):
+            break
+    
+    # Criar as subplots para as imagens por classe (matriz)
+    fig, axes = plt.subplots(len(classes), num_samples, figsize=(15, 5))
+    
+    for i, cls in enumerate(classes):
+        for j, img in enumerate(class_images[cls]):
+            # Verificar se a imagem é RGB ou em escala de cinza
+            if img.ndimension() == 3:  # RGB (C, H, W)
+                img = img.permute(1, 2, 0)  # Transforma para (H, W, C)
+            
+            axes[i, j].imshow(img.squeeze(), cmap='gray' if img.ndimension() == 2 else None)
+            axes[i, j].set_xticks([])  # Remover marcações do eixo X
+            axes[i, j].set_yticks([])  # Remover marcações do eixo Y
+            
+        # Definir o título da linha (para todas as imagens dessa classe)
+        axes[i, 0].set_ylabel(f"{class_names[cls]}", fontsize=14)
+    
+    plt.tight_layout()
+    plt.show()
 
 # Filter dataset for selected classes (e.g., [0, 1, 2])
 def filter_classes(dataset, classes=[0, 1, 2]):
