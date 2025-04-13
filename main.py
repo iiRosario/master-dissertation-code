@@ -33,7 +33,7 @@ def create_results_dir(seed):
     else:
         results_dir_name = f"results_uncertainty_sampling_{seed}"
     
-    results_dir_path = os.path.join(RESULTS_PATH, results_dir_name)
+    results_dir_path = os.path.join(RESULTS_PATH, ORACLE_ANSWER, results_dir_name)
 
     # Remove a pasta se ela já existir
     if os.path.exists(results_dir_path):
@@ -251,7 +251,12 @@ def main():
     train_loader = DataLoader(train_set, batch_size=64, shuffle=True)
     val_loader = DataLoader(val_set, batch_size=64, shuffle=True)
     test_loader = DataLoader(test_set, batch_size=64, shuffle=True)
-    init_active_learning(train_loader=train_loader, val_loader=val_loader, test_loader=test_loader, seed=0)
+
+    for seed in range(30):
+        print(f"\n\n\n========== AL =============")
+        print(f"Running on seed: {seed}")
+        # Inicializar o modelo e o ciclo de aprendizado ativo
+        init_active_learning(train_loader=train_loader, val_loader=val_loader, test_loader=test_loader, seed=seed)
 
 if __name__ == "__main__":
     main() 
