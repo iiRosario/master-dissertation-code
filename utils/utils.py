@@ -79,6 +79,8 @@ def plot_sample_images(dataset, classes=[0, 1, 2], num_samples=3):
     
     plt.tight_layout()
     plt.show() """
+
+
 def plot_sample_images(dataset, classes=[0, 1, 2], num_samples=3):
     # Mapear as classes numéricas para seus respectivos nomes no FashionMNIST ou CIFAR-10
     class_names = ['T-shirt/top', 'Trouser', 'Pullover']  # Para FashionMNIST (adaptar para CIFAR-10)
@@ -181,18 +183,15 @@ def plot_metric_over_cycles(csv_path, plot_path, variable, filename):
 
     df[variable] = df[variable].apply(parse_list)
 
-    # Calcular média e std da métrica por ciclo
+    # Calcular média da métrica por ciclo
     df['mean'] = df[variable].apply(np.mean)
-    df['std'] = df[variable].apply(np.std)
 
     cycles = df['cycle']
     means = df['mean']
-    stds = df['std']
 
     # Plotar
     plt.figure(figsize=(10, 6))
     plt.plot(cycles, means, label=f'Average {variable}', color='blue')
-    plt.fill_between(cycles, means - stds, means + stds, color='blue', alpha=0.2, label='±1 STD')
 
     # Forçar eixo X com valores inteiros
     ax = plt.gca()
