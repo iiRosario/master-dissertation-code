@@ -7,7 +7,7 @@ PATH_LOG = os.path.join(BASE_DIR, "logs")
 RESULTS_PATH = os.path.join(BASE_DIR, "runs")
 
 
-CLASSES = [0, 1, 2]
+
 TRAIN_SIZE_PERCENTAGE = 0.7
 TEST_SIZE_PERCENTAGE = 0.2
 
@@ -17,7 +17,7 @@ DATA_AUG_NOISE_FACTOR = 0.5
 ### LEARNER CONFIGURATION ###
 INIT_TRAINING_PERCENTAGE = 0.05
 INIT_TRAINING_EPHOCHS = 1
-INIT_LEARNING_RATE = 0.25
+INIT_LEARNING_RATE = 0.1
 
 QUERY_STRATEGY = uncertainty_sampling 
 #QUERY_STRATEGY = margin_sampling  
@@ -25,12 +25,24 @@ QUERY_STRATEGY = uncertainty_sampling
 
 
 
+
 MODELS= os.path.join(BASE_DIR, "models")
 
 
 ## Active Learning Configuration
+CLASSES = [0, 1, 2]
 NUM_CYCLES = 200
 NUM_ANNOTATORS = 30
+
+
+ORACLE_ANSWER_RANDOM = "random"
+ORACLE_ANSWER_REPUTATION = "reputation"
+ORACLE_ANSWER_GROUND_TRUTH = "ground_truth"
+
+ORACLE_ANSWER = ORACLE_ANSWER_RANDOM
+
+
+
 
 DATA_DIR = "data"
 LABELED = "original_data"

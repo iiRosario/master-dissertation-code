@@ -14,7 +14,7 @@ from env import *
 from collections import Counter
 from utils.DataManager import *
 from utils.utils import *
-import random
+
 import shutil
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -44,12 +44,7 @@ def create_results_dir(seed):
     
     return results_dir_path
 
-# Função para fornecer um rótulo aleatório (simulando o "oracle" aleatório)
-def annotator_query(image, seed):
-    # Supondo que as classes possíveis sejam 0, 1 e 2
-    possible_classes = [0, 1, 2]  # Substituir por suas classes reais, se necessário
-    # Retorna um rótulo aleatório entre as classes
-    return random.choice(possible_classes)
+
 
 def init_model_lenet5(device=device, epochs=INIT_TRAINING_EPHOCHS, lr=INIT_LEARNING_RATE, batch_size=64):
     model = LeNet5(device)
@@ -158,6 +153,8 @@ def init_active_learning(train_loader, val_loader, test_loader, seed):
                          oracle_label=-1, ground_truth_label=-1, metrics=init_results)
     
 
+    oracle = Committee(annotators=[], seed=seed)
+
     for cycle in range(NUM_CYCLES):
         print("==========================")
         print(f"Cycle {cycle + 1}/{NUM_CYCLES}")
@@ -168,11 +165,17 @@ def init_active_learning(train_loader, val_loader, test_loader, seed):
         # Obter imagem e ground truth
         query_image = x_rest_train[query_idx]
         true_label = y_rest_train[query_idx]
-    
-        oracle_label = annotator_query(query_image, seed)
-        #oracle_label = true_label.item()
+        
+        if(ORACLE_ANSWER == "reputation"):
+            continue
+        elif(ORACLE_ANSWER == "ground_truth"):
+            oracle_label = true_label.item()
+            target = torch.tensor([oracle_label])
+        else:
+            oracle_label = oracle.random_answer()
+            target = torch.tensor([oracle_label])
 
-        learner.teach(X=query_image, y=torch.tensor([oracle_label]))
+        learner.teach(X=query_image, y=target)
 
         # Remover amostra consultada do conjunto de treino e adicionar aos conjuntos rotulados
         x_rest_train = np.delete(x_rest_train, query_idx, axis=0)

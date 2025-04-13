@@ -1,29 +1,18 @@
 from entities.Annotator import Annotator
 from env import *
-
+import random
 
 
 class Committee:
-    def __init__(self, annotators: list = None):
-
+    def __init__(self, annotators= None, seed=-1):
+        self.seed = seed
         self.annotators = annotators if annotators is not None else []
-        self.list_num_specialists = self.count_specialists()
+        
 
-
-    def count_specialists(self):
-        list_num_specialists = [0] * NUM_CLASSES
-
-        for annotator in self.annotators:
-            list_num_specialists[annotator.specialized_class] += 1
-        return list_num_specialists
-
-    def get_annotator_by_id(self, id_):
-        """Returns the annotator with the given ID, or None if not found."""
-        for annotator in self.annotators:
-            if annotator.id == id_:
-                return annotator
-        return None
-
+    def random_answer(self):
+        rng = random.Random(self.seed) 
+        return rng.choice(CLASSES)
+    
 
 
     def __repr__(self):
