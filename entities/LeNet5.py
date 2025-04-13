@@ -56,7 +56,7 @@ class LeNet5(nn.Module):
     def fit(self, X, y):
         self.train()
         criterion = nn.CrossEntropyLoss()
-        optimizer = torch.optim.Adam(self.parameters(), lr=self.lr, weight_decay=1e-3)
+        optimizer = torch.optim.Adam(self.parameters(), lr=self.lr, weight_decay=1e-4)
 
         if isinstance(X, np.ndarray):
             X_tensor = torch.from_numpy(X).float()

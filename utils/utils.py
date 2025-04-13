@@ -120,12 +120,6 @@ def write_metrics_to_csv(csv_path, csv_name, cycle, oracle_label, ground_truth_l
 
     
 
-
-
-
-
-
-
 # ============================= PLOTAR MÉTRICAS ============================
 def plot_metric_over_cycles(csv_path, plot_path, variable, filename):
     df = pd.read_csv(csv_path)
