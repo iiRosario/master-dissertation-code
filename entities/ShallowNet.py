@@ -101,12 +101,10 @@ class ShallowNet(nn.Module):
     def predict_proba(self, X):
         self.eval()  # Coloca o modelo no modo de avaliação
         with torch.no_grad():
-            if isinstance(X, np.ndarray):
-                X_tensor = torch.from_numpy(X).float()
-            elif isinstance(X, torch.Tensor):
+            if isinstance(X, torch.Tensor):
                 X_tensor = X.clone().detach().float()
             else:
-                raise TypeError("Input X must be a numpy array or torch tensor")
+                raise TypeError("Input X must be a torch tensor")
             
             if X_tensor.dim() == 3:  # [batch_size, 28, 28]
                 X_tensor = X_tensor.unsqueeze(1)  # Vira [batch_size, 1, 28, 28]
