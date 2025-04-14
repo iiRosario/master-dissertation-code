@@ -147,7 +147,7 @@ def init_active_learning(train_loader, val_loader, test_loader, seed):
     plot_metric_over_cycles(csv_path=csv_path, plot_path=plots_path, variable="accuracy_per_class", filename=f"precision_{seed}")
     
     plot_all_metrics_over_cycles(csv_path=csv_path, plot_path=plots_path, seed=seed)
-
+    
 
     print("DONE! for seed: ", seed)
 
@@ -219,3 +219,5 @@ def main():
 
 if __name__ == "__main__":
     main() 
+
+    after_run_plot_metric
