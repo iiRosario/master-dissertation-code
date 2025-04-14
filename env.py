@@ -31,7 +31,7 @@ MODELS= os.path.join(BASE_DIR, "models")
 
 ## Active Learning Configuration
 CLASSES = [0, 1, 2, 3]
-NUM_CYCLES = 2
+NUM_CYCLES = 350
 NUM_ANNOTATORS = 30
 
 IS_CIFAR = 1
