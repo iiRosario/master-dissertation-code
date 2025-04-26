@@ -13,7 +13,7 @@ from sklearn.preprocessing import label_binarize
 from env import *
 
 class LeNet5(nn.Module):
-    def __init__(self, device='cpu', epochs=INIT_TRAINING_EPHOCHS, lr=INIT_LEARNING_RATE, batch_size=64 ):
+    def __init__(self, device='cpu', dataset=DATASET_CIFAR_10, epochs=EPHOCS, lr=INIT_LEARNING_RATE, batch_size=64 ):
         super(LeNet5, self).__init__()
         self.device = device
         self.epochs = epochs
@@ -26,7 +26,7 @@ class LeNet5(nn.Module):
         self.pool = nn.AvgPool2d(2, 2)
         self.conv2 = nn.Conv2d(2, 4, kernel_size=5)
 
-        if IS_CIFAR:
+        if dataset == DATASET_CIFAR_10:
             # CIFAR-10: 32x32 -> conv1: 28x28 -> pool: 14x14
             # -> conv2: 10x10 -> pool: 5x5 → 4 filtros → 4*5*5 = 100
             fc_input_size = 4 * 5 * 5
@@ -210,27 +210,26 @@ class LeNet5(nn.Module):
         all_preds = np.array(all_preds)
         all_labels = np.array(all_labels)
 
-        classes = sorted(np.unique(y_tensor.cpu().numpy()))  # ou simplesmente classes = [0, 1, 2] se souberes de antemão
+        # Classes únicas
+        classes = sorted(np.unique(y_tensor.cpu().numpy()))  
 
-        # Métricas por classe (corrigido)
-        precision_per_class = precision_score(all_labels, all_preds, average=None, zero_division=0, labels=classes).tolist()
-        recall_per_class = recall_score(all_labels, all_preds, average=None, zero_division=0, labels=classes).tolist()
-        f1_per_class = f1_score(all_labels, all_preds, average=None, zero_division=0, labels=classes).tolist()
-
-        # Confusion Matrix (corrigido)
+        # Confusion Matrix
         cm = confusion_matrix(all_labels, all_preds, labels=classes)
 
         # Accuracy por classe
         acc_per_class = []
         for i in range(len(cm)):
-            tp = cm[i, i]
-            fn = cm[i, :].sum() - tp
-            fp = cm[:, i].sum() - tp
-            tn = cm.sum() - (tp + fn + fp)
-            acc = (tp + tn) / cm.sum() if cm.sum() > 0 else 0
+            correct = cm[i, i]
+            total = cm[i, :].sum()
+            acc = correct / total if total > 0 else 0
             acc_per_class.append(float(acc))
 
-        # Specificity
+        # Precision, Recall, F1 Score por classe
+        precision_per_class = precision_score(all_labels, all_preds, average=None, zero_division=0, labels=classes).tolist()
+        recall_per_class = recall_score(all_labels, all_preds, average=None, zero_division=0, labels=classes).tolist()
+        f1_per_class = f1_score(all_labels, all_preds, average=None, zero_division=0, labels=classes).tolist()
+
+        # Specificity por classe
         specificity_per_class = []
         for i in range(len(cm)):
             tn = cm.sum() - (cm[i, :].sum() + cm[:, i].sum() - cm[i, i])
@@ -244,29 +243,10 @@ class LeNet5(nn.Module):
             "precision_per_class": [f"{p:.4f}" for p in precision_per_class],
             "recall_per_class": [f"{r:.4f}" for r in recall_per_class],
             "f1_score_per_class": [f"{f1:.4f}" for f1 in f1_per_class],
-            "sensitivity_per_class": [f"{r:.4f}" for r in recall_per_class],
+            "sensitivity_per_class": [f"{r:.4f}" for r in recall_per_class],  # Sensitivity é o mesmo que recall
             "specificity_per_class": [f"{s:.4f}" for s in specificity_per_class],
             "confusion_matrix": cm.tolist()
         }
 
         return formatted_metrics
 
-
-
-
-# === Define the device (CPU ou CUDA) ===
-device = 'cuda' if torch.cuda.is_available() else 'cpu'
-
-# === Create Model Instance ===
-model = LeNet5(device=device)
-
-# === Create Output Directory ===
-output_dir = "models"
-os.makedirs(output_dir, exist_ok=True)
-
-# === Define Save Path ===
-save_path = os.path.join(output_dir, "lenet5_modified_base.pth")
-
-# === Save Model Weights (untrained) ===
-torch.save(model.state_dict(), save_path)
-print(f"lenet5_modified model saved to: {save_path}")

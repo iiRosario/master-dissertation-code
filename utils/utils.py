@@ -14,7 +14,7 @@ def get_label_distribution(dataset):
     labels = [dataset[i][1] for i in range(len(dataset))]
     return Counter(labels)
 
-def plot_distribution(distribution, split_name, colors=['royalblue', 'tomato', 'goldenrod']):
+def plot_distribution(distribution, split_name, save_path='.', colors=CLASS_COLORS):
     classes = sorted(distribution.keys())
     counts = [distribution[c] for c in classes]
 
@@ -25,17 +25,21 @@ def plot_distribution(distribution, split_name, colors=['royalblue', 'tomato', '
     plt.title(f'Class Distribution - {split_name}')
     plt.tight_layout()
 
-    filename = f"class_distribution_{split_name.lower()}.png"
-    plt.savefig(filename)
-    plt.close()
-    print(f"Saved: {filename}")
+    os.makedirs(save_path, exist_ok=True)
 
-def plot_distribution_2(distribution, split_name, colors=None):
+    filename = f"class_distribution_{split_name.lower()}.png"
+    full_path = os.path.join(save_path, filename)
+
+    plt.savefig(full_path)
+    plt.close()
+    print(f"Saved: {full_path}")
+
+def plot_distribution_2(distribution, split_name, colors=None, save_path='.'):
     classes = sorted(distribution.keys())
     counts = [distribution[c] for c in classes]
 
     if colors is None or len(colors) < len(classes):
-        # Gera cores únicas usando uma colormap (viridis é uma boa opção)
+        # Gera cores únicas usando uma colormap
         cmap = cm.get_cmap('tab10' if len(classes) <= 10 else 'tab20', len(classes))
         colors = [cmap(i) for i in range(len(classes))]
 
@@ -47,9 +51,10 @@ def plot_distribution_2(distribution, split_name, colors=None):
     plt.tight_layout()
 
     filename = f"class_distribution_{split_name.lower()}.png"
-    plt.savefig(filename)
+    full_path = os.path.join(save_path, filename)
+    plt.savefig(full_path)
     plt.close()
-    print(f"Saved: {filename}")
+    print(f"Saved: {full_path}")
 
 def plot_sample_images(dataset, classes, num_samples=6):
     fig, axes = plt.subplots(1, num_samples, figsize=(15, 15))
@@ -69,37 +74,6 @@ def plot_sample_images(dataset, classes, num_samples=6):
     plt.tight_layout()
     plt.show()
 
-""" # Função para plotar 3 figuras do dataset para as classes 0, 1 e 2
-def plot_sample_images(dataset, classes=[0, 1, 2], num_samples=3):
-    # Mapear as classes numéricas para seus respectivos nomes no FashionMNIST
-    class_names = ['T-shirt/top', 'Trouser', 'Pullover']  # Nomes das classes 0, 1, 2
-
-    # Criar um dicionário para armazenar imagens de cada classe
-    class_images = {cls: [] for cls in classes}
-    
-    # Encontrar 'num_samples' imagens para cada classe
-    for img, label in dataset:
-        if label in classes and len(class_images[label]) < num_samples:
-            class_images[label].append(img)
-        
-        # Stop early if we have enough images for all classes
-        if all(len(class_images[cls]) >= num_samples for cls in classes):
-            break
-    
-    # Criar as subplots para as imagens por classe (matriz)
-    fig, axes = plt.subplots(len(classes), num_samples, figsize=(15, 5))
-    
-    for i, cls in enumerate(classes):
-        for j, img in enumerate(class_images[cls]):
-            axes[i, j].imshow(img.squeeze(), cmap='gray')
-            axes[i, j].set_xticks([])  # Remover marcações do eixo X
-            axes[i, j].set_yticks([])  # Remover marcações do eixo Y
-            
-        # Definir o título da linha (para todas as imagens dessa classe)
-        axes[i, 0].set_ylabel(f"{class_names[cls]}", fontsize=14)
-    
-    plt.tight_layout()
-    plt.show() """
 
 
 def plot_sample_images(dataset, classes=[0, 1, 2], num_samples=3):
@@ -238,74 +212,27 @@ def plot_metric_over_cycles(csv_path, plot_path, variable, filename):
 
 
 def plot_all_metrics_over_cycles(csv_path, plot_path, seed):
+
+    accuracy_plot_path = os.path.join(plot_path, "avg_accuracy")     
+    os.makedirs(accuracy_plot_path, exist_ok=True)
+    
+    precision_plot_path = os.path.join(plot_path, "avg_precision")     
+    os.makedirs(accuracy_plot_path, exist_ok=True)
+    
+    
     plot_metric_over_cycles(csv_path=csv_path, 
-                            plot_path=plot_path, 
+                            plot_path=accuracy_plot_path, 
                             variable="accuracy_per_class",
                             filename=f"accuracy_{seed}")
     
     plot_metric_over_cycles(csv_path=csv_path, 
-                            plot_path=plot_path, 
+                            plot_path=precision_plot_path, 
                             variable="precision_per_class",
                             filename=f"precision_{seed}")
 
 
 
-def after_run_plot_metric(csv_folder, plot_path, variable, filename):
-    all_metrics = {}
 
-    # Ler todos os CSVs da pasta
-    for csv_file in os.listdir(csv_folder):
-        if csv_file.endswith(".csv"):
-            csv_path = os.path.join(csv_folder, csv_file)
-            df = pd.read_csv(csv_path)
-
-            # Converter a coluna da métrica de string para lista
-            def parse_list(row):
-                return [float(x) for x in row.strip("[]").replace("'", "").split(',')]
-
-            df[variable] = df[variable].apply(parse_list)
-
-            # Agregar métricas por ciclo
-            for _, row in df.iterrows():
-                cycle = int(row['cycle'])
-                values = row[variable]
-
-                if cycle not in all_metrics:
-                    all_metrics[cycle] = []
-                all_metrics[cycle].extend(values)
-
-    # Ordenar ciclos e calcular média + std
-    sorted_cycles = sorted(all_metrics.keys())
-    avg_per_cycle = [np.mean(all_metrics[cycle]) for cycle in sorted_cycles]
-    std_per_cycle = [np.std(all_metrics[cycle]) for cycle in sorted_cycles]
-
-    # Plot
-    plt.figure(figsize=(10, 6))
-    plt.plot(sorted_cycles, avg_per_cycle, label=f'Average {variable}', color='blue')
-    plt.fill_between(
-        sorted_cycles,
-        np.array(avg_per_cycle) - np.array(std_per_cycle),
-        np.array(avg_per_cycle) + np.array(std_per_cycle),
-        color='blue',
-        alpha=0.2,
-        label='±1 STD'
-    )
-
-    ax = plt.gca()
-    ax.xaxis.set_major_locator(MaxNLocator(integer=True))
-
-    plt.title(f'Average {variable.replace("_", " ").title()} over Active Learning Cycles')
-    plt.xlabel('Cycle')
-    plt.ylabel(variable.replace("_", " ").title())
-    plt.legend()
-    plt.grid(True)
-
-    os.makedirs(plot_path, exist_ok=True)
-    plot_file = os.path.join(plot_path, f'{filename}.png')
-    plt.savefig(plot_file)
-    plt.close()
-
-    print(f"Plot saved to: {plot_file}")
 
 
 ############################### DATA AUGMENTATION ###############################

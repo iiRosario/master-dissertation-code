@@ -22,38 +22,33 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 print("Using device:", device)
 
-def print_distribuition(x, y):
+DATASET_IN_USE = "None"
+QUERY_STRATEGY_IN_USE = "None"
+ORACLE_ANSWER_IN_USE = "None"
 
-    y = y.numpy() if isinstance(y, torch.Tensor) else y
-    print(f"x_init_train: {len(x)}, y_init_train:", Counter(y))
-   
-def create_results_dir(seed):
-    if QUERY_STRATEGY == margin_sampling:
-        results_dir_name = f"margin_sampling_{seed}"
-    elif QUERY_STRATEGY == entropy_sampling:
-        results_dir_name = f"entropy_sampling_{seed}"
+def create_results_dir():
+    if QUERY_STRATEGY_IN_USE == margin_sampling:
+        results_dir_name = f"margin_sampling"
+    elif QUERY_STRATEGY_IN_USE == entropy_sampling:
+        results_dir_name = f"entropy_sampling"
     else:
         results_dir_name = f"uncertainty_sampling"
     
-    results_dir_path = os.path.join(RESULTS_PATH, ORACLE_ANSWER, results_dir_name)
+    results_dir_path = os.path.join(RESULTS_PATH, DATASET_IN_USE, ORACLE_ANSWER_IN_USE, results_dir_name)
     os.makedirs(results_dir_path, exist_ok=True)
     
     return results_dir_path
 
 
-
-def init_model_lenet5(device=device, epochs=INIT_TRAINING_EPHOCHS, lr=INIT_LEARNING_RATE, batch_size=64):
-    model = LeNet5(device)
-    output_dir = MODELS
-    os.makedirs(output_dir, exist_ok=True)
-    save_path = os.path.join(output_dir, "lenet_base.pth")
-    # Save the untrained model weights
-    torch.save(model.state_dict(), save_path)
-    print(f"LeNet-5 base model saved to: {save_path}")
-    return model.to(device)
-
 # Active learning loop
 def init_active_learning(train_loader, val_loader, test_loader, seed):
+    #CREATE RESULTS DIR
+    results_path = create_results_dir()
+    plots_path = os.path.join(results_path, "plots")
+    os.makedirs(plots_path, exist_ok=True)
+    results_file_name = f"results_{seed}.csv"
+    results_csv_path = os.path.join(results_path, results_file_name)
+    if os.path.exists(results_csv_path): os.remove(results_csv_path)
 
     # Obter x_train, y_train, x_val, y_val, x_test, y_test
     x_train, y_train = extract_data(train_loader)
@@ -67,43 +62,35 @@ def init_active_learning(train_loader, val_loader, test_loader, seed):
     
     x_init_train, x_rest_train, y_init_train, y_rest_train = train_test_split(x_train, y_train, train_size=INIT_TRAINING_PERCENTAGE, stratify=y_train, random_state=seed)
 
-    x_train_labeled = []
-    y_train_labeled = []
     
-    plot_distribution_2(Counter(y_init_train.tolist()), "init_train", CLASS_COLORS)
-    plot_distribution_2(Counter(y_init_train.tolist()), "rest_train", CLASS_COLORS)
+    plot_distribution_2(Counter(y_init_train.tolist()), "init_train", CLASS_COLORS, plots_path)
+    plot_distribution_2(Counter(y_rest_train.tolist()), "rest_train", CLASS_COLORS, plots_path)
 
-    model = init_model_lenet5(device=device, epochs=INIT_TRAINING_EPHOCHS, lr=INIT_LEARNING_RATE, batch_size=64)
+    model = LeNet5(dataset=DATASET_IN_USE).to(device)
     learner = ActiveLearner(
         estimator = model,
-        query_strategy=QUERY_STRATEGY,  # Using uncertainty sampling as the query strategy
+        query_strategy=QUERY_STRATEGY_IN_USE,  # Using uncertainty sampling as the query strategy
         X_training=x_init_train, y_training=y_init_train
     )
-    #CREATE RESULTS DIR
-    results_path = create_results_dir(seed) 
-    results_file_name = f"results_{seed}.csv"
-    results_csv_path = os.path.join(results_path, results_file_name)
-    if os.path.exists(results_csv_path): os.remove(results_csv_path)
+    
     init_results = learner.estimator.evaluate(x_val, y_val)    
     write_metrics_to_csv(csv_path=results_path, csv_name=results_file_name, cycle=0, oracle_label=-1, ground_truth_label=-1, metrics=init_results)
     
-
+    x_train_labeled = []
+    y_train_labeled = []
     oracle = Committee(annotators=[], seed=seed)
 
     for cycle in range(NUM_CYCLES):
         print("==========================")
         print(f"Cycle {cycle + 1}/{NUM_CYCLES}")
 
-        # Query da amostra mais incerta 
         query_idx, query_instance = learner.query(x_rest_train)
-        print(f"query_idx: {query_idx}")
-        # Obter imagem e ground truth
         query_image = x_rest_train[query_idx]
         true_label = y_rest_train[query_idx]
         
-        if(ORACLE_ANSWER == "reputation"):
+        if(ORACLE_ANSWER_IN_USE == "reputation"):
             continue
-        elif(ORACLE_ANSWER == "ground_truth"):
+        elif(ORACLE_ANSWER_IN_USE == "ground_truth"):
             oracle_label = true_label.item()
             target = torch.tensor([oracle_label])
         else:
@@ -112,11 +99,9 @@ def init_active_learning(train_loader, val_loader, test_loader, seed):
 
         learner.teach(X=query_image, y=target)
 
-        # Remover amostra consultada do conjunto de treino e adicionar aos conjuntos rotulados
         x_rest_train = np.delete(x_rest_train, query_idx, axis=0)
         y_rest_train = np.delete(y_rest_train, query_idx, axis=0)
 
-        # Adicionar a amostra rotulada ao conjunto de treino rotulado
         x_train_labeled.append(query_image)
         y_train_labeled.append(true_label)
 
@@ -125,15 +110,10 @@ def init_active_learning(train_loader, val_loader, test_loader, seed):
         else:
             metrics = learner.estimator.evaluate(x_val, y_val)    
 
-        write_metrics_to_csv(csv_path=results_path, csv_name=results_file_name, 
-                             cycle=cycle+1, oracle_label=oracle_label, ground_truth_label=true_label.item(), metrics=metrics)
+        write_metrics_to_csv(csv_path=results_path, csv_name=results_file_name, cycle=cycle+1, oracle_label=oracle_label, ground_truth_label=true_label.item(), metrics=metrics)
     
     
-    plots_path = os.path.join(results_path, "plots")
     csv_path = os.path.join(results_path, results_file_name)
-    os.makedirs(plots_path, exist_ok=True)
-    plot_metric_over_cycles(csv_path=csv_path, plot_path=plots_path, variable="accuracy_per_class", filename=f"precision_{seed}")
-    
     plot_all_metrics_over_cycles(csv_path=csv_path, plot_path=plots_path, seed=seed)
     
 
@@ -141,29 +121,61 @@ def init_active_learning(train_loader, val_loader, test_loader, seed):
 
 
 
+def init_perm_statistic(train_loader, val_loader, test_loader):
+    for seed in range(30):
+        print(f"\n\n\n========== AL =============")
+        print(f"Dataset: {DATASET_IN_USE}")
+        print(f"Query Strategy: {QUERY_STRATEGY_IN_USE}")
+        print(f"Oracle Answer: {ORACLE_ANSWER_IN_USE}")
+        print(f"Running on seed: {seed}")
+        print(f"Learning Rate: {INIT_LEARNING_RATE}")
+        print(f"Init training (%): {INIT_TRAINING_PERCENTAGE * 100}%")
+        print(f"Running on seed: {seed}")
+        
+        # Inicializar o modelo e o ciclo de aprendizado ativo
+        init_active_learning(train_loader=train_loader, val_loader=val_loader, test_loader=test_loader, seed=seed)
+
+def init_perm_oracle_answer(train_loader, val_loader, test_loader):
+    global ORACLE_ANSWER_IN_USE
+    #for ORACLE_ANSWER_IN_USE in ORACLE_ANSWERS:
+    #    init_perm_statistic(train_loader=train_loader, val_loader=val_loader, test_loader=test_loader)
+
+    ORACLE_ANSWER_IN_USE = ORACLE_ANSWER_GROUND_TRUTH
+    init_perm_statistic(train_loader=train_loader, val_loader=val_loader, test_loader=test_loader)
+
+def init_perm_query_strategy(train_loader, val_loader, test_loader):
+    global QUERY_STRATEGY_IN_USE
+    #for QUERY_STRATEGY_IN_USE in QUERY_STRATEGIES:
+    #    init_perm_oracle_answer(train_loader=train_loader, val_loader=val_loader, test_loader=test_loader)
+   
+    QUERY_STRATEGY_IN_USE = UNCERTAINTY_SAMPLING
+    init_perm_oracle_answer(train_loader=train_loader, val_loader=val_loader, test_loader=test_loader)
 
 
-# Main function to set up the environment
 def main():
 
-    transform = transforms.Compose([
-        transforms.ToTensor(),
-        transforms.Normalize((0.5,), (0.5,))
-    ])
+    global DATASET_IN_USE
+    DATASET_IN_USE = DATASET_CIFAR_10
+    path_dir = os.path.join(RESULTS_PATH, DATASET_IN_USE)
 
-    # Carregar e combinar FashionMNIST (train + test)
-    #train_data = datasets.FashionMNIST(root='./data', train=True, download=True, transform=transform)
-    #test_data = datasets.FashionMNIST(root='./data', train=False, download=True, transform=transform)
-    
-    train_data = datasets.CIFAR10(root='./data', train=True, download=True, transform=transform)
-    test_data = datasets.CIFAR10(root='./data', train=False, download=True, transform=transform)
+    transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.5,), (0.5,))])
+   
+    if(DATASET_IN_USE == DATASET_MNIST):
+        train_data = datasets.MNIST(root='./data', train=True, download=True, transform=transform)
+        test_data = datasets.MNIST(root='./data', train=True, download=True, transform=transform)
+    elif(DATASET_IN_USE == DATASET_MNIST_FASHION):
+        train_data = datasets.FashionMNIST(root='./data', train=True, download=True, transform=transform)
+        test_data = datasets.FashionMNIST(root='./data', train=False, download=True, transform=transform)
+    elif(DATASET_IN_USE == DATASET_CIFAR_10):
+        train_data = datasets.CIFAR10(root='./data', train=True, download=True, transform=transform)
+        test_data = datasets.CIFAR10(root='./data', train=False, download=True, transform=transform)
 
-    # Filtrar as classes 0, 1 e 2
+    full_dataset = ConcatDataset([train_data, test_data])
     train_data = filter_classes(train_data, classes=CLASSES)
     test_data = filter_classes(test_data, classes=CLASSES)
+
     
-    full_dataset = ConcatDataset([train_data, test_data])
-    #plot_sample_images(full_dataset, classes=CLASSES, num_samples=6)
+    #plot_sample_images(full_dataset, classes=CLASSES, num_samples=len(CLASSES))
     
     #noisy_dataset = add_noise_to_data(full_dataset, noise_factor=DATA_AUG_NOISE_FACTOR)
     #plot_sample_images(noisy_dataset, classes=CLASSES, num_samples=6)
@@ -173,7 +185,6 @@ def main():
 
     #full_dataset = ConcatDataset([full_dataset, noisy_dataset, rotated_noisy_dataset])  # Junta o dataset original com os dados "noisy"
 
-    # Cálculo das proporções: 70% treino, 20% teste, 10% validação
     total_size = len(full_dataset)
     train_size = int(TRAIN_SIZE_PERCENTAGE * total_size)
     test_size = int(TEST_SIZE_PERCENTAGE * total_size)
@@ -181,29 +192,24 @@ def main():
 
     train_set, test_set, val_set = random_split(full_dataset, [train_size, test_size, val_size])
 
-    # Obter distribuições
     train_dist = get_label_distribution(train_set)
     val_dist = get_label_distribution(val_set)
     test_dist = get_label_distribution(test_set)
     
-    print(f"Train, Val, Tes distribution: {train_dist}, {val_dist}, {test_dist}")
-    #plot_distribution(train_dist, "Train", colors=CLASS_COLORS)
-    #plot_distribution(val_dist, "Validation", colors=CLASS_COLORS)
-    #plot_distribution(test_dist, "Test", colors=CLASS_COLORS)
+    print(f"Train, Val, Tes distribution: {get_label_distribution(train_set)}, {val_dist}, {test_dist}")
+    plot_distribution(train_dist, "Train", save_path=path_dir, colors=CLASS_COLORS)
+    plot_distribution(val_dist, "Validation", save_path=path_dir, colors=CLASS_COLORS)
+    plot_distribution(test_dist, "Test", save_path=path_dir, colors=CLASS_COLORS)
 
     train_loader = DataLoader(train_set, batch_size=64, shuffle=True)
     val_loader = DataLoader(val_set, batch_size=64, shuffle=True)
     test_loader = DataLoader(test_set, batch_size=64, shuffle=True)
 
-    for seed in range(30):
-        print(f"\n\n\n========== AL =============")
-        print(f"Running on seed: {seed}")
-        print(f"Learning Rate: {INIT_LEARNING_RATE}")
-        print(f"Init training (%): {INIT_TRAINING_PERCENTAGE * 100}%")
-        print(f"Running on seed: {seed}")
-        
-        # Inicializar o modelo e o ciclo de aprendizado ativo
-        init_active_learning(train_loader=train_loader, val_loader=val_loader, test_loader=test_loader, seed=seed)
+
+    init_perm_query_strategy(train_loader=train_loader, val_loader=val_loader, test_loader=test_loader)
+
+    
+    
 
 if __name__ == "__main__":
     main() 
