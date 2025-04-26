@@ -16,7 +16,7 @@ from utils.DataManager import *
 from utils.utils import *
 from entities.ShallowNet import ShallowNet
 import shutil
-
+    
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 #device = "cpu"
 
@@ -52,16 +52,6 @@ def init_model_lenet5(device=device, epochs=INIT_TRAINING_EPHOCHS, lr=INIT_LEARN
     print(f"LeNet-5 base model saved to: {save_path}")
     return model.to(device)
 
-def init_model_shallow_net(device=device, epochs=INIT_TRAINING_EPHOCHS, lr=INIT_LEARNING_RATE, batch_size=64):
-    model = ShallowNet(device)
-    output_dir = MODELS
-    os.makedirs(output_dir, exist_ok=True)
-    save_path = os.path.join(output_dir, "shallownet_base.pth")
-    # Save the untrained model weights
-    torch.save(model.state_dict(), save_path)
-    print(f"shallownet base model saved to: {save_path}")
-    return model.to(device)
-
 # Active learning loop
 def init_active_learning(train_loader, val_loader, test_loader, seed):
 
@@ -74,16 +64,14 @@ def init_active_learning(train_loader, val_loader, test_loader, seed):
     indices = torch.randperm(len(x_train))  # Shuffle reprodutível
     x_train = x_train[indices]
     y_train = y_train[indices]
-
+    
     x_init_train, x_rest_train, y_init_train, y_rest_train = train_test_split(x_train, y_train, train_size=INIT_TRAINING_PERCENTAGE, stratify=y_train, random_state=seed)
 
     x_train_labeled = []
     y_train_labeled = []
-
-    torch.manual_seed(seed)  
-    indices = torch.randperm(len(x_init_train))  # Shuffle reprodutível
-    x_init_train = x_init_train[indices]
-    y_init_train = y_init_train[indices]
+    
+    plot_distribution_2(Counter(y_init_train.tolist()), "init_train", CLASS_COLORS)
+    plot_distribution_2(Counter(y_init_train.tolist()), "rest_train", CLASS_COLORS)
 
     model = init_model_lenet5(device=device, epochs=INIT_TRAINING_EPHOCHS, lr=INIT_LEARNING_RATE, batch_size=64)
     learner = ActiveLearner(
@@ -108,7 +96,7 @@ def init_active_learning(train_loader, val_loader, test_loader, seed):
 
         # Query da amostra mais incerta 
         query_idx, query_instance = learner.query(x_rest_train)
-        
+        print(f"query_idx: {query_idx}")
         # Obter imagem e ground truth
         query_image = x_rest_train[query_idx]
         true_label = y_rest_train[query_idx]
@@ -177,13 +165,13 @@ def main():
     full_dataset = ConcatDataset([train_data, test_data])
     #plot_sample_images(full_dataset, classes=CLASSES, num_samples=6)
     
-    noisy_dataset = add_noise_to_data(full_dataset, noise_factor=DATA_AUG_NOISE_FACTOR)
+    #noisy_dataset = add_noise_to_data(full_dataset, noise_factor=DATA_AUG_NOISE_FACTOR)
     #plot_sample_images(noisy_dataset, classes=CLASSES, num_samples=6)
     
-    rotated_noisy_dataset = add_bidirectional_rotation(noisy_dataset, angle=25)
+    #rotated_noisy_dataset = add_bidirectional_rotation(noisy_dataset, angle=25)
     #plot_sample_images(rotated_noisy_dataset, classes=CLASSES, num_samples=6)
 
-    full_dataset = ConcatDataset([full_dataset, noisy_dataset, rotated_noisy_dataset])  # Junta o dataset original com os dados "noisy"
+    #full_dataset = ConcatDataset([full_dataset, noisy_dataset, rotated_noisy_dataset])  # Junta o dataset original com os dados "noisy"
 
     # Cálculo das proporções: 70% treino, 20% teste, 10% validação
     total_size = len(full_dataset)
@@ -220,4 +208,4 @@ def main():
 if __name__ == "__main__":
     main() 
 
-    after_run_plot_metric
+    

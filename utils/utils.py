@@ -8,7 +8,7 @@ import csv
 import pandas as pd
 from torchvision.transforms import functional as F
 from matplotlib.ticker import MaxNLocator
-
+import matplotlib.cm as cm
 
 def get_label_distribution(dataset):
     labels = [dataset[i][1] for i in range(len(dataset))]
@@ -17,6 +17,27 @@ def get_label_distribution(dataset):
 def plot_distribution(distribution, split_name, colors=['royalblue', 'tomato', 'goldenrod']):
     classes = sorted(distribution.keys())
     counts = [distribution[c] for c in classes]
+
+    plt.figure(figsize=(6, 4))
+    plt.bar([str(c) for c in classes], counts, color=colors[:len(classes)])
+    plt.xlabel('Class')
+    plt.ylabel('Number of Samples')
+    plt.title(f'Class Distribution - {split_name}')
+    plt.tight_layout()
+
+    filename = f"class_distribution_{split_name.lower()}.png"
+    plt.savefig(filename)
+    plt.close()
+    print(f"Saved: {filename}")
+
+def plot_distribution_2(distribution, split_name, colors=None):
+    classes = sorted(distribution.keys())
+    counts = [distribution[c] for c in classes]
+
+    if colors is None or len(colors) < len(classes):
+        # Gera cores únicas usando uma colormap (viridis é uma boa opção)
+        cmap = cm.get_cmap('tab10' if len(classes) <= 10 else 'tab20', len(classes))
+        colors = [cmap(i) for i in range(len(classes))]
 
     plt.figure(figsize=(6, 4))
     plt.bar([str(c) for c in classes], counts, color=colors[:len(classes)])
