@@ -13,78 +13,74 @@ from sklearn.preprocessing import label_binarize
 from env import *
 
 class LeNet5(nn.Module):
-    def __init__(self, device='cpu', dataset=DATASET_CIFAR_10, epochs=EPHOCS, lr=INIT_LEARNING_RATE, batch_size=64 ):
+    def __init__(self, device='cpu', dataset=DATASET_CIFAR_10, epochs=EPHOCS, lr=LEARNING_RATE, batch_size=64):
         super(LeNet5, self).__init__()
         self.device = device
         self.epochs = epochs
         self.lr = lr
         self.batch_size = batch_size
 
-        in_channels = 3 if IS_CIFAR else 1
-
-        self.conv1 = nn.Conv2d(in_channels, 2, kernel_size=5)
-        self.pool = nn.AvgPool2d(2, 2)
-        self.conv2 = nn.Conv2d(2, 4, kernel_size=5)
+        if (dataset == DATASET_CIFAR_10): 
+            in_channels = 3
+        else:
+            in_channels = 1
+        
+         # Camada 1: Convolucional com 6 filtros de 5x5
+        self.conv1 = nn.Conv2d(in_channels, 6, kernel_size=5)
+        self.pool = nn.AvgPool2d(2, 2)  # Usando average pooling como na LeNet original
+        # Camada 2: Convolucional com 16 filtros de 5x5
+        self.conv2 = nn.Conv2d(6, 16, kernel_size=5)
+        
 
         if dataset == DATASET_CIFAR_10:
-            # CIFAR-10: 32x32 -> conv1: 28x28 -> pool: 14x14
-            # -> conv2: 10x10 -> pool: 5x5 → 4 filtros → 4*5*5 = 100
-            fc_input_size = 4 * 5 * 5
+            # Após conv1 (6 filtros 5x5) + pool: 28x28 -> 14x14
+            # Após conv2 (16 filtros 5x5) + pool: 10x10 -> 5x5
+            fc_input_size = 16 * 5 * 5  # 16 filtros, cada um de tamanho 5x5 após pooling
         else:
-            # MNIST: 28x28 -> conv1: 24x24 -> pool: 12x12
-            # -> conv2: 8x8 -> pool: 4x4 → 4 filtros → 4*4*4 = 64
-            fc_input_size = 4 * 4 * 4
+             # Para MNIST, a entrada é 28x28 e a estrutura é similar.
+            fc_input_size = 16 * 4 * 4  # Após as camadas convolucionais e pooling
 
-        self.fc1 = nn.Linear(fc_input_size, 30)
-        self.fc2 = nn.Linear(30, 20)
-        self.fc3 = nn.Linear(20, len(CLASSES))  # Adapta dinamicamente às classes
-
-        self.dropout1 = nn.Dropout(p=0.6)
-        self.dropout2 = nn.Dropout(p=0.6)
-
+        self.fc1 = nn.Linear(fc_input_size, 120)
+        self.fc2 = nn.Linear(120, 84)
+        self.fc3 = nn.Linear(84, len(CLASSES))
+        self.dropout = nn.Dropout(0.5)  # Dropout com probabilidade de 50% por padrão
         self.to(self.device)
 
     def forward(self, x):
-        x = self.pool(torch.tanh(self.conv1(x)))
-        x = self.pool(torch.tanh(self.conv2(x)))
+        x = self.pool(F.relu(self.conv1(x)))  # Conv1 + ReLU + Pooling
+        x = self.pool(F.relu(self.conv2(x)))  # Conv2 + ReLU + Pooling
         x = x.view(x.size(0), -1)
-        x = self.dropout1(torch.tanh(self.fc1(x)))
-        x = self.dropout2(torch.tanh(self.fc2(x)))
+        x = F.relu(self.fc1(x))
+        x = self.dropout(x)  # Aplica o Dropout após a primeira camada fully connected
+        x = F.relu(self.fc2(x))
+        x = self.dropout(x)  # Aplica o Dropout após a segunda camada fully connected
         x = self.fc3(x)
         return x
 
-    # Função de treinamento (fit)
-    """ def fit(self, X, y):
+    def init_fit(self, X, y, epochs=INIT_EPHOCS):
         self.train()
         criterion = nn.CrossEntropyLoss()
-        optimizer = torch.optim.Adam(self.parameters(), lr=self.lr, weight_decay=1e-4)
+        optimizer = torch.optim.Adam(self.parameters(), lr=self.lr)
 
-        if isinstance(X, np.ndarray):
-            X_tensor = torch.from_numpy(X).float()
-        elif isinstance(X, torch.Tensor):
+        if isinstance(X, torch.Tensor):
             X_tensor = X.clone().detach().float()
         else:
-            raise TypeError("Input X must be a numpy array or torch tensor")
+            raise TypeError("Input X must be a torch tensor")
 
-        if X_tensor.dim() == 3:
-            X_tensor = X_tensor.unsqueeze(0)
-        if X_tensor.dim() == 4 and X_tensor.shape[1] != 1:
-            X_tensor = X_tensor.unsqueeze(1)
+        
+        if X_tensor.dim() != 4 and X_tensor.dim() != 3:
+             raise ValueError(f"Unexpected input shape: {X_tensor.shape}\nInput X must have at least 3 dimensions (C, H, W).")
 
-        if isinstance(y, np.ndarray):
-            y_tensor = torch.from_numpy(y).long()
-        elif isinstance(y, torch.Tensor):
+        if isinstance(y, torch.Tensor):
             y_tensor = y.clone().detach().long()
         else:
-            raise TypeError("Input y must be a numpy array or torch tensor")
+            raise TypeError("Input y must be a torch tensor")
 
-        if y_tensor.dim() == 0:
-            y_tensor = y_tensor.unsqueeze(0)
 
         dataset = TensorDataset(X_tensor, y_tensor)
         train_loader = DataLoader(dataset, batch_size=self.batch_size, shuffle=True)
 
-        for epoch in range(self.epochs):
+        for epoch in range(epochs):
             running_loss = 0.0
             for images, labels in train_loader:
                 images, labels = images.to(self.device), labels.to(self.device)
@@ -96,15 +92,14 @@ class LeNet5(nn.Module):
                 running_loss += loss.item()
 
             avg_train_loss = running_loss / len(train_loader)
-            print(f"    Epoch [{epoch+1}/{self.epochs}] - Train Loss: {avg_train_loss:.4f}")
+            print(f"    Epoch [{epoch+1}/{epochs}] - Train Loss: {avg_train_loss:.4f}")
 
         return self
-     """
 
     def fit(self, X, y):
         self.train()
         criterion = nn.CrossEntropyLoss()
-        optimizer = torch.optim.Adam(self.parameters(), lr=self.lr, weight_decay=1e-4)
+        optimizer = torch.optim.Adam(self.parameters(), lr=self.lr)
 
         if isinstance(X, torch.Tensor):
             X_tensor = X.clone().detach().float()

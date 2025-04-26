@@ -14,8 +14,6 @@ from env import *
 from collections import Counter
 from utils.DataManager import *
 from utils.utils import *
-from entities.ShallowNet import ShallowNet
-import shutil
     
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 #device = "cpu"
@@ -67,10 +65,10 @@ def init_active_learning(train_loader, val_loader, test_loader, seed):
     plot_distribution_2(Counter(y_rest_train.tolist()), "rest_train", CLASS_COLORS, plots_path)
 
     model = LeNet5(dataset=DATASET_IN_USE).to(device)
+    model = model.init_fit(x_init_train, y_init_train)
     learner = ActiveLearner(
         estimator = model,
-        query_strategy=QUERY_STRATEGY_IN_USE,  # Using uncertainty sampling as the query strategy
-        X_training=x_init_train, y_training=y_init_train
+        query_strategy=QUERY_STRATEGY_IN_USE
     )
     
     init_results = learner.estimator.evaluate(x_val, y_val)    
@@ -88,9 +86,9 @@ def init_active_learning(train_loader, val_loader, test_loader, seed):
         query_image = x_rest_train[query_idx]
         true_label = y_rest_train[query_idx]
         
-        if(ORACLE_ANSWER_IN_USE == "reputation"):
+        if(ORACLE_ANSWER_IN_USE == ORACLE_ANSWER_REPUTATION):
             continue
-        elif(ORACLE_ANSWER_IN_USE == "ground_truth"):
+        elif(ORACLE_ANSWER_IN_USE == ORACLE_ANSWER_GROUND_TRUTH):
             oracle_label = true_label.item()
             target = torch.tensor([oracle_label])
         else:
@@ -127,8 +125,9 @@ def init_perm_statistic(train_loader, val_loader, test_loader):
         print(f"Dataset: {DATASET_IN_USE}")
         print(f"Query Strategy: {QUERY_STRATEGY_IN_USE}")
         print(f"Oracle Answer: {ORACLE_ANSWER_IN_USE}")
-        print(f"Running on seed: {seed}")
-        print(f"Learning Rate: {INIT_LEARNING_RATE}")
+        print(f"Learning Rate: {LEARNING_RATE}")
+        print(f"Init Epochs: {INIT_EPHOCS}")
+        print(f"Epochs: {EPHOCS}")
         print(f"Init training (%): {INIT_TRAINING_PERCENTAGE * 100}%")
         print(f"Running on seed: {seed}")
         
