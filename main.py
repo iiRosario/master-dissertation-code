@@ -59,27 +59,20 @@ def init_active_learning_pool(train_loader, val_loader, test_loader, seed):
     x_val, y_val     = extract_data(val_loader)
     x_test, y_test   = extract_data(test_loader)
     
-    # se extract_data já retorna tensores, faça:
-    if isinstance(x_train, torch.Tensor):
-        x_train = x_train.cpu().numpy()
-        y_train = y_train.cpu().numpy()
-
-    torch.manual_seed(seed)
     # Embaralha o inicial
+    torch.manual_seed(seed)
     perm = torch.randperm(len(x_train))
     x_train, y_train = x_train[perm], y_train[perm]
 
     # Split inicial e pool
-    x_init, x_pool, y_init, y_pool = train_test_split(
-        x_train, y_train,
-        train_size=INIT_TRAINING_PERCENTAGE,
-        stratify=y_train,
-        random_state=seed
-    )
+    x_init, x_unlabeled, y_init, y_unlabeled = train_test_split(x_train, y_train, 
+                                                                train_size=INIT_TRAINING_PERCENTAGE,
+                                                                stratify=y_train,
+                                                                random_state=seed)
 
     # Visualiza distribuição inicial
     plot_distribution_2(Counter(y_init.tolist()), "init_train", CLASS_COLORS, plots_path)
-    plot_distribution_2(Counter(y_pool.tolist()), "pool_train", CLASS_COLORS, plots_path)
+    plot_distribution_2(Counter(y_unlabeled.tolist()), "unlabeled_train", CLASS_COLORS, plots_path)
 
     # --- inicializa modelo e learner ---
     model = LeNet5(device=device, dataset=DATASET_IN_USE).to(device)
@@ -100,32 +93,19 @@ def init_active_learning_pool(train_loader, val_loader, test_loader, seed):
         print(f"========================\nCycle {cycle + 1}/{NUM_CYCLES}")
 
         # Query por batch de instâncias
-        query_idx, query_instances = learner.query(x_pool, n_instances=POOL_SIZE)
+        query_idx, query_instances = learner.query(x_unlabeled, n_instances=POOL_SIZE)
 
         # Seleciona imagens e rótulos verdadeiros
-        X_new = x_pool[query_idx]
-        y_new = y_pool[query_idx]
+        x_query = x_unlabeled[query_idx]
+        y_query = y_unlabeled[query_idx]
 
-        # converte X_new e y_new para NumPy (e garante CPU)
-        if isinstance(X_new, torch.Tensor):
-            X_new = X_new.cpu().numpy()
-        if isinstance(y_new, np.ndarray):
-            y_targets = y_new  # já é NumPy
-        else:
-            # se você gerou y_targets como tensor, então:
-            y_targets = y_targets.cpu().numpy()
-
-        learner.teach(
-            X=X_new,
-            y=y_targets,
-            only_new=False
-        )
+        learner.teach(X=x_query, y=y_query)
         
         print(f"learner DL size: {len(learner.y_training)}")
         
         # Remove do pool as instâncias já rotuladas
-        x_pool = np.delete(x_pool, query_idx, axis=0)
-        y_pool = np.delete(y_pool, query_idx, axis=0)
+        x_unlabeled = np.delete(x_unlabeled, query_idx, axis=0)
+        y_unlabeled = np.delete(y_unlabeled, query_idx, axis=0)
 
         # Avalia no validation ou test
         if cycle + 1 == NUM_CYCLES:
