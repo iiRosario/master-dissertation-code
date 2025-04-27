@@ -45,102 +45,92 @@ def create_results_dir():
 
 
 def init_active_learning_pool(train_loader, val_loader, test_loader, seed):
-    #CREATE RESULTS DIR
+    # --- setup de diretórios e CSV ---
     results_path = create_results_dir()
     plots_path = os.path.join(results_path, "plots")
     os.makedirs(plots_path, exist_ok=True)
-    results_file_name = f"results_{seed}.csv"
-    results_csv_path = os.path.join(results_path, results_file_name)
-    if os.path.exists(results_csv_path): os.remove(results_csv_path)
+    results_file = f"results_{seed}.csv"
+    csv_path = os.path.join(results_path, results_file)
+    if os.path.exists(csv_path):
+        os.remove(csv_path)
 
-    # Obter x_train, y_train, x_val, y_val, x_test, y_test
+    # --- extrair dados dos loaders ---
     x_train, y_train = extract_data(train_loader)
-    x_val, y_val = extract_data(val_loader)
-    x_test, y_test = extract_data(test_loader)
+    x_val, y_val     = extract_data(val_loader)
+    x_test, y_test   = extract_data(test_loader)
 
-    torch.manual_seed(seed)  
-    indices = torch.randperm(len(x_train))  # Shuffle reprodutível
-    x_train = x_train[indices]
-    y_train = y_train[indices]
-    
-    x_init_train, x_rest_train, y_init_train, y_rest_train = train_test_split(x_train, y_train, train_size=INIT_TRAINING_PERCENTAGE, stratify=y_train, random_state=seed)
+    torch.manual_seed(seed)
+    # Embaralha o inicial
+    perm = torch.randperm(len(x_train))
+    x_train, y_train = x_train[perm], y_train[perm]
 
-    
-    plot_distribution_2(Counter(y_init_train.tolist()), "init_train", CLASS_COLORS, plots_path)
-    plot_distribution_2(Counter(y_rest_train.tolist()), "rest_train", CLASS_COLORS, plots_path)
+    # Split inicial e pool
+    x_init, x_pool, y_init, y_pool = train_test_split(
+        x_train, y_train,
+        train_size=INIT_TRAINING_PERCENTAGE,
+        stratify=y_train,
+        random_state=seed
+    )
 
+    # Visualiza distribuição inicial
+    plot_distribution_2(Counter(y_init.tolist()), "init_train", CLASS_COLORS, plots_path)
+    plot_distribution_2(Counter(y_pool.tolist()), "pool_train", CLASS_COLORS, plots_path)
+
+    # --- inicializa modelo e learner ---
     model = LeNet5(device=device, dataset=DATASET_IN_USE).to(device)
     learner = ActiveLearner(
-        estimator = model,
+        estimator=model,
         query_strategy=QUERY_STRATEGY_IN_USE,
-        X_training=x_init_train, y_training=y_init_train
+        X_training=x_init, y_training=y_init
     )
-    
-    init_results = learner.estimator.evaluate(x_val, y_val)    
-    write_metrics_to_csv(csv_path=results_path, csv_name=results_file_name, cycle=0, oracle_label=-1, ground_truth_label=-1, metrics=init_results)
-    
-    oracle = Committee(annotators=[], seed=seed)
 
+    # Avaliação inicial
+    init_metrics = learner.estimator.evaluate(x_val, y_val)
+    write_metrics_to_csv(results_path, results_file, cycle=0,
+                         oracle_label=-1, ground_truth_label=-1,
+                         metrics=init_metrics)
+
+    # --- loop de Active Learning em batch ---
     for cycle in range(NUM_CYCLES):
-        print("==========================")
-        print(f"Cycle {cycle + 1}/{NUM_CYCLES}")
+        print(f"========================\nCycle {cycle + 1}/{NUM_CYCLES}")
 
+        # Query por batch de instâncias
+        query_idx, query_instances = learner.query(x_pool, n_instances=POOL_SIZE)
 
-        x_query = []
-        y_query = []
-        oracle_labels = []
-        true_labels = []
-        for i in range(POOL_SIZE):
-            query_idx, query_instance = learner.query(x_rest_train)
-            query_image = x_rest_train[query_idx]
-            true_label = y_rest_train[query_idx]
+        # Seleciona imagens e rótulos verdadeiros
+        X_new = x_pool[query_idx]
+        y_new = y_pool[query_idx]
+        # transforma em tensor para teach
+        y_targets = torch.tensor(y_new.tolist(), device=device)
 
-            if ORACLE_ANSWER_IN_USE == ORACLE_ANSWER_REPUTATION:
-                continue
-            elif ORACLE_ANSWER_IN_USE == ORACLE_ANSWER_GROUND_TRUTH:
-                oracle_label = true_label.item()
-                target = oracle_label  # já como int
-            else:
-                oracle_label = oracle.random_answer()
-                target = oracle_label
+        # Ensina (re-treina) usando warm start ou full retrain
+        learner.teach(
+            X=X_new, y=y_targets,
+            only_new=False
+        )
+        print(f"learner DL size: {len(learner.y_training)}")
+        # Remove do pool as instâncias já rotuladas
+        x_pool = np.delete(x_pool, query_idx, axis=0)
+        y_pool = np.delete(y_pool, query_idx, axis=0)
 
-            # Se ainda for tensor, converter para numpy
-            if isinstance(query_image, torch.Tensor):
-                query_image = query_image.numpy()
-
-            x_query.append(query_image)
-            y_query.append(target)
-
-            x_rest_train = np.delete(x_rest_train, query_idx, axis=0)
-            y_rest_train = np.delete(y_rest_train, query_idx, axis=0)
-
-            oracle_labels.append(oracle_label)
-            true_labels.append(true_label.item())
-
-        # Depois do loop:
-        x_query = np.array(x_query)
-        y_query = np.array(y_query)
-
-        learner.teach(X=x_query, y=y_query)
-        print("learner y size: " + len(learner.y_training))
-    
-        if(cycle + 1 == NUM_CYCLES):
-            print("FINAL CYCLE")
-            metrics = learner.estimator.evaluate(x_test, y_test)    
+        # Avalia no validation ou test
+        if cycle + 1 == NUM_CYCLES:
+            metrics = learner.estimator.evaluate(x_test, y_test)
         else:
-            metrics = learner.estimator.evaluate(x_val, y_val)    
+            metrics = learner.estimator.evaluate(x_val, y_val)
 
-        print(f"AVG Accuracy: {avg_metric(metrics, 'accuracy_per_class'):.4f} | AVG Precision: {avg_metric(metrics, 'precision_per_class'):.4f}")
+        print(f"   AVG Acc: {avg_metric(metrics, 'accuracy_per_class'):.4f}\n"+
+              f"   AVG Precision: {avg_metric(metrics, 'precision_per_class'):.4f}")
 
-        write_metrics_to_csv(csv_path=results_path, csv_name=results_file_name, cycle=cycle+1, oracle_label=oracle_labels, ground_truth_label=true_labels, metrics=metrics)
-    
-    
-    csv_path = os.path.join(results_path, results_file_name)
-    plot_all_metrics_over_cycles(csv_path=csv_path, plot_path=plots_path, seed=seed)
-    
+        write_metrics_to_csv(results_path, results_file,
+                             cycle=cycle+1,
+                             oracle_label=-1,  # se usar oracle diferente, modifique aqui
+                             ground_truth_label=-1,
+                             metrics=metrics)
 
-    print("DONE! for seed: ", seed) 
-
+    # --- pós-processamento ---
+    plot_all_metrics_over_cycles(csv_path, plots_path, seed)
+    print("Done for seed:", seed)
 
 
 def init_active_learning(train_loader, val_loader, test_loader, seed):
@@ -236,7 +226,7 @@ def init_perm_statistic(train_loader, val_loader, test_loader):
         print(f"Running on seed: {seed}")
         
         # Inicializar o modelo e o ciclo de aprendizado ativo
-        init_active_learning(train_loader=train_loader, val_loader=val_loader, test_loader=test_loader, seed=seed)
+        init_active_learning_pool(train_loader=train_loader, val_loader=val_loader, test_loader=test_loader, seed=seed)
 
 def init_perm_oracle_answer(train_loader, val_loader, test_loader):
     global ORACLE_ANSWER_IN_USE
