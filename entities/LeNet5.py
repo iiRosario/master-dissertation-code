@@ -11,7 +11,7 @@ from sklearn.preprocessing import label_binarize
 from env import *
 
 class LeNet5(nn.Module):
-    def __init__(self, device='cpu', dataset=DATASET_CIFAR_10, epochs=EPHOCS, lr=LEARNING_RATE, batch_size=64):
+    def __init__(self, device='cpu', dataset=DATASET_CIFAR_10, epochs=EPHOCS, lr=LEARNING_RATE, batch_size=BATCH_SIZE):
         super(LeNet5, self).__init__()
         self.device = device
         self.epochs = epochs

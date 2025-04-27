@@ -15,8 +15,8 @@ from collections import Counter
 from utils.DataManager import *
 from utils.utils import *
     
-#device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-device = "cpu"
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+#device = "cpu"
 
 print("Using device:", device)
 
@@ -76,8 +76,6 @@ def init_active_learning(train_loader, val_loader, test_loader, seed):
     init_results = learner.estimator.evaluate(x_val, y_val)    
     write_metrics_to_csv(csv_path=results_path, csv_name=results_file_name, cycle=0, oracle_label=-1, ground_truth_label=-1, metrics=init_results)
     
-    x_train_labeled = []
-    y_train_labeled = []
     oracle = Committee(annotators=[], seed=seed)
 
     for cycle in range(NUM_CYCLES):
@@ -102,9 +100,6 @@ def init_active_learning(train_loader, val_loader, test_loader, seed):
         
         x_rest_train = np.delete(x_rest_train, query_idx, axis=0)
         y_rest_train = np.delete(y_rest_train, query_idx, axis=0)
-
-        x_train_labeled.append(query_image)
-        y_train_labeled.append(true_label)
 
         if(cycle + 1 == NUM_CYCLES):
             print("FINAL CYCLE")
