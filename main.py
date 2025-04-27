@@ -58,6 +58,11 @@ def init_active_learning_pool(train_loader, val_loader, test_loader, seed):
     x_train, y_train = extract_data(train_loader)
     x_val, y_val     = extract_data(val_loader)
     x_test, y_test   = extract_data(test_loader)
+    
+    # se extract_data já retorna tensores, faça:
+    if isinstance(x_train, torch.Tensor):
+        x_train = x_train.cpu().numpy()
+        y_train = y_train.cpu().numpy()
 
     torch.manual_seed(seed)
     # Embaralha o inicial
@@ -100,15 +105,24 @@ def init_active_learning_pool(train_loader, val_loader, test_loader, seed):
         # Seleciona imagens e rótulos verdadeiros
         X_new = x_pool[query_idx]
         y_new = y_pool[query_idx]
-        # transforma em tensor para teach
-        y_targets = torch.tensor(y_new.tolist(), device=device)
 
-        # Ensina (re-treina) usando warm start ou full retrain
+        # converte X_new e y_new para NumPy (e garante CPU)
+        if isinstance(X_new, torch.Tensor):
+            X_new = X_new.cpu().numpy()
+        if isinstance(y_new, np.ndarray):
+            y_targets = y_new  # já é NumPy
+        else:
+            # se você gerou y_targets como tensor, então:
+            y_targets = y_targets.cpu().numpy()
+
         learner.teach(
-            X=X_new, y=y_targets,
+            X=X_new,
+            y=y_targets,
             only_new=False
         )
+        
         print(f"learner DL size: {len(learner.y_training)}")
+        
         # Remove do pool as instâncias já rotuladas
         x_pool = np.delete(x_pool, query_idx, axis=0)
         y_pool = np.delete(y_pool, query_idx, axis=0)
@@ -220,7 +234,6 @@ def init_perm_statistic(train_loader, val_loader, test_loader):
         print(f"Query Strategy: {QUERY_STRATEGY_IN_USE}")
         print(f"Oracle Answer: {ORACLE_ANSWER_IN_USE}")
         print(f"Learning Rate: {LEARNING_RATE}")
-        print(f"Init Epochs: {INIT_EPHOCS}")
         print(f"Epochs: {EPHOCS}")
         print(f"Init training (%): {INIT_TRAINING_PERCENTAGE * 100}%")
         print(f"Running on seed: {seed}")
