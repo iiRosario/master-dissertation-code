@@ -88,6 +88,8 @@ def init_active_learning_pool(train_loader, val_loader, test_loader, seed):
                          oracle_label=-1, ground_truth_label=-1,
                          metrics=init_metrics)
 
+
+    oracle = Committee(annotators=[], seed=seed)
     # --- loop de Active Learning em batch ---
     for cycle in range(NUM_CYCLES):
         print(f"========================\nCycle {cycle + 1}/{NUM_CYCLES}")
@@ -97,9 +99,19 @@ def init_active_learning_pool(train_loader, val_loader, test_loader, seed):
 
         # Seleciona imagens e rótulos verdadeiros
         x_query = x_unlabeled[query_idx]
-        y_query = y_unlabeled[query_idx]
+        true_labels = y_unlabeled[query_idx]
 
-        learner.teach(X=x_query, y=y_query)
+        if(ORACLE_ANSWER_IN_USE == ORACLE_ANSWER_REPUTATION):
+            continue
+        elif(ORACLE_ANSWER_IN_USE == ORACLE_ANSWER_GROUND_TRUTH):
+            oracle_labels = true_labels
+        else:
+            answers = oracle.random_answer(n=POOL_SIZE)
+            print(answers)
+            oracle_labels = torch.tensor(answers, dtype=true_labels.dtype)
+
+
+        learner.teach(X=x_query, y=oracle_labels)
         
         print(f"learner DL size: {len(learner.y_training)}")
         
@@ -115,11 +127,16 @@ def init_active_learning_pool(train_loader, val_loader, test_loader, seed):
 
         print(f"   AVG Acc: {avg_metric(metrics, 'accuracy_per_class'):.4f}\n"+
               f"   AVG Precision: {avg_metric(metrics, 'precision_per_class'):.4f}")
+        
+        list_oracle_labels = []
+        list_true_labels = []
+        for i in range(len(query_idx)):
+            list_oracle_labels.append(oracle_labels[i].item())
+            list_true_labels.append(true_labels[i].item())
 
-        write_metrics_to_csv(results_path, results_file,
-                             cycle=cycle+1,
-                             oracle_label=-1,  # se usar oracle diferente, modifique aqui
-                             ground_truth_label=-1,
+        write_metrics_to_csv(results_path, results_file,  cycle=cycle+1,
+                             oracle_label=list_oracle_labels,  # se usar oracle diferente, modifique aqui
+                             ground_truth_label=list_true_labels,
                              metrics=metrics)
 
     # --- pós-processamento ---
@@ -127,7 +144,7 @@ def init_active_learning_pool(train_loader, val_loader, test_loader, seed):
     print("Done for seed:", seed)
 
 
-def init_active_learning(train_loader, val_loader, test_loader, seed):
+""" def init_active_learning(train_loader, val_loader, test_loader, seed):
     #CREATE RESULTS DIR
     results_path = create_results_dir()
     plots_path = os.path.join(results_path, "plots")
@@ -202,7 +219,7 @@ def init_active_learning(train_loader, val_loader, test_loader, seed):
     plot_all_metrics_over_cycles(csv_path=csv_path, plot_path=plots_path, seed=seed)
     
 
-    print("DONE! for seed: ", seed) 
+    print("DONE! for seed: ", seed)  """
 
 
 
@@ -226,7 +243,7 @@ def init_perm_oracle_answer(train_loader, val_loader, test_loader):
     #for ORACLE_ANSWER_IN_USE in ORACLE_ANSWERS:
     #    init_perm_statistic(train_loader=train_loader, val_loader=val_loader, test_loader=test_loader)
 
-    ORACLE_ANSWER_IN_USE = ORACLE_ANSWER_GROUND_TRUTH
+    ORACLE_ANSWER_IN_USE = ORACLE_ANSWER_RANDOM
     init_perm_statistic(train_loader=train_loader, val_loader=val_loader, test_loader=test_loader)
 
 def init_perm_query_strategy(train_loader, val_loader, test_loader):
@@ -241,58 +258,58 @@ def init_perm_query_strategy(train_loader, val_loader, test_loader):
 def main():
 
     global DATASET_IN_USE
-    DATASET_IN_USE = DATASET_MNIST_FASHION
-    path_dir = os.path.join(RESULTS_PATH, DATASET_IN_USE)
+    for DATASET_IN_USE in DATASETS:
+        path_dir = os.path.join(RESULTS_PATH, DATASET_IN_USE)
 
-    transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.5,), (0.5,))])
-   
-    if(DATASET_IN_USE == DATASET_MNIST):
-        train_data = datasets.MNIST(root='./data', train=True, download=True, transform=transform)
-        test_data = datasets.MNIST(root='./data', train=True, download=True, transform=transform)
-    elif(DATASET_IN_USE == DATASET_MNIST_FASHION):
-        train_data = datasets.FashionMNIST(root='./data', train=True, download=True, transform=transform)
-        test_data = datasets.FashionMNIST(root='./data', train=False, download=True, transform=transform)
-    elif(DATASET_IN_USE == DATASET_CIFAR_10):
-        train_data = datasets.CIFAR10(root='./data', train=True, download=True, transform=transform)
-        test_data = datasets.CIFAR10(root='./data', train=False, download=True, transform=transform)
-
-    full_dataset = ConcatDataset([train_data, test_data])
-    train_data = filter_classes(train_data, classes=CLASSES)
-    test_data = filter_classes(test_data, classes=CLASSES)
-
+        transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.5,), (0.5,))])
     
-    #plot_sample_images(full_dataset, classes=CLASSES, num_samples=len(CLASSES))
-    
-    #noisy_dataset = add_noise_to_data(full_dataset, noise_factor=DATA_AUG_NOISE_FACTOR)
-    #plot_sample_images(noisy_dataset, classes=CLASSES, num_samples=6)
-    
-    #rotated_noisy_dataset = add_bidirectional_rotation(noisy_dataset, angle=25)
-    #plot_sample_images(rotated_noisy_dataset, classes=CLASSES, num_samples=6)
+        if(DATASET_IN_USE == DATASET_MNIST):
+            train_data = datasets.MNIST(root='./data', train=True, download=True, transform=transform)
+            test_data = datasets.MNIST(root='./data', train=True, download=True, transform=transform)
+        elif(DATASET_IN_USE == DATASET_MNIST_FASHION):
+            train_data = datasets.FashionMNIST(root='./data', train=True, download=True, transform=transform)
+            test_data = datasets.FashionMNIST(root='./data', train=False, download=True, transform=transform)
+        elif(DATASET_IN_USE == DATASET_CIFAR_10):
+            train_data = datasets.CIFAR10(root='./data', train=True, download=True, transform=transform)
+            test_data = datasets.CIFAR10(root='./data', train=False, download=True, transform=transform)
 
-    #full_dataset = ConcatDataset([full_dataset, noisy_dataset, rotated_noisy_dataset])  # Junta o dataset original com os dados "noisy"
+        full_dataset = ConcatDataset([train_data, test_data])
+        train_data = filter_classes(train_data, classes=CLASSES)
+        test_data = filter_classes(test_data, classes=CLASSES)
 
-    total_size = len(full_dataset)
-    train_size = int(TRAIN_SIZE_PERCENTAGE * total_size)
-    test_size = int(TEST_SIZE_PERCENTAGE * total_size)
-    val_size = total_size - train_size - test_size
+        
+        #plot_sample_images(full_dataset, classes=CLASSES, num_samples=len(CLASSES))
+        
+        #noisy_dataset = add_noise_to_data(full_dataset, noise_factor=DATA_AUG_NOISE_FACTOR)
+        #plot_sample_images(noisy_dataset, classes=CLASSES, num_samples=6)
+        
+        #rotated_noisy_dataset = add_bidirectional_rotation(noisy_dataset, angle=25)
+        #plot_sample_images(rotated_noisy_dataset, classes=CLASSES, num_samples=6)
 
-    train_set, test_set, val_set = random_split(full_dataset, [train_size, test_size, val_size])
+        #full_dataset = ConcatDataset([full_dataset, noisy_dataset, rotated_noisy_dataset])  # Junta o dataset original com os dados "noisy"
 
-    train_dist = get_label_distribution(train_set)
-    val_dist = get_label_distribution(val_set)
-    test_dist = get_label_distribution(test_set)
-    
-    print(f"Train, Val, Tes distribution: {get_label_distribution(train_set)}, {val_dist}, {test_dist}")
-    plot_distribution(train_dist, "Train", save_path=path_dir, colors=CLASS_COLORS)
-    plot_distribution(val_dist, "Validation", save_path=path_dir, colors=CLASS_COLORS)
-    plot_distribution(test_dist, "Test", save_path=path_dir, colors=CLASS_COLORS)
+        total_size = len(full_dataset)
+        train_size = int(TRAIN_SIZE_PERCENTAGE * total_size)
+        test_size = int(TEST_SIZE_PERCENTAGE * total_size)
+        val_size = total_size - train_size - test_size
 
-    train_loader = DataLoader(train_set, batch_size=64, shuffle=True)
-    val_loader = DataLoader(val_set, batch_size=64, shuffle=True)
-    test_loader = DataLoader(test_set, batch_size=64, shuffle=True)
+        train_set, test_set, val_set = random_split(full_dataset, [train_size, test_size, val_size])
+
+        train_dist = get_label_distribution(train_set)
+        val_dist = get_label_distribution(val_set)
+        test_dist = get_label_distribution(test_set)
+        
+        print(f"Train, Val, Tes distribution: {get_label_distribution(train_set)}, {val_dist}, {test_dist}")
+        plot_distribution(train_dist, "Train", save_path=path_dir, colors=CLASS_COLORS)
+        plot_distribution(val_dist, "Validation", save_path=path_dir, colors=CLASS_COLORS)
+        plot_distribution(test_dist, "Test", save_path=path_dir, colors=CLASS_COLORS)
+
+        train_loader = DataLoader(train_set, batch_size=64, shuffle=True)
+        val_loader = DataLoader(val_set, batch_size=64, shuffle=True)
+        test_loader = DataLoader(test_set, batch_size=64, shuffle=True)
 
 
-    init_perm_query_strategy(train_loader=train_loader, val_loader=val_loader, test_loader=test_loader)
+        init_perm_query_strategy(train_loader=train_loader, val_loader=val_loader, test_loader=test_loader)
 
     
     

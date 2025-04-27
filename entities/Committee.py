@@ -7,11 +7,10 @@ class Committee:
     def __init__(self, annotators= None, seed=-1):
         self.seed = seed
         self.annotators = annotators if annotators is not None else []
-        
+        random.seed(seed)
 
-    def random_answer(self):
-        rng = random.Random(self.seed) 
-        return rng.choice(CLASSES)
+    def random_answer(self, n):
+        return [random.choice(CLASSES) for _ in range(n)]
     
 
 
