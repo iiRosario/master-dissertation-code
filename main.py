@@ -241,7 +241,7 @@ def init_perm_query_strategy(train_loader, val_loader, test_loader):
 def main():
 
     global DATASET_IN_USE
-    DATASET_IN_USE = DATASET_CIFAR_10
+    DATASET_IN_USE = DATASET_MNIST_FASHION
     path_dir = os.path.join(RESULTS_PATH, DATASET_IN_USE)
 
     transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.5,), (0.5,))])
