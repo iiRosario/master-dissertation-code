@@ -22,6 +22,7 @@ LEARNING_RATE = 0.002
 EPHOCS = 6
 BATCH_SIZE = 256
 
+
 UNCERTAINTY_SAMPLING = uncertainty_sampling 
 MARGIN_SAMPLING = margin_sampling  
 ENTROPY_SAMPLING = entropy_sampling
@@ -34,7 +35,7 @@ MODELS= os.path.join(BASE_DIR, "models")
 
 ## Active Learning Configuration
 CLASSES = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
-NUM_CYCLES = 50
+NUM_CYCLES = 600
 NUM_ANNOTATORS = 30
 
 ORACLE_ANSWER_RANDOM = "random"

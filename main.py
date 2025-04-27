@@ -136,11 +136,11 @@ def init_perm_statistic(train_loader, val_loader, test_loader):
 
 def init_perm_oracle_answer(train_loader, val_loader, test_loader):
     global ORACLE_ANSWER_IN_USE
-    for ORACLE_ANSWER_IN_USE in ORACLE_ANSWERS:
-        init_perm_statistic(train_loader=train_loader, val_loader=val_loader, test_loader=test_loader)
+    #for ORACLE_ANSWER_IN_USE in ORACLE_ANSWERS:
+    #    init_perm_statistic(train_loader=train_loader, val_loader=val_loader, test_loader=test_loader)
 
-    #ORACLE_ANSWER_IN_USE = ORACLE_ANSWER_RANDOM
-    #init_perm_statistic(train_loader=train_loader, val_loader=val_loader, test_loader=test_loader)
+    ORACLE_ANSWER_IN_USE = ORACLE_ANSWER_GROUND_TRUTH
+    init_perm_statistic(train_loader=train_loader, val_loader=val_loader, test_loader=test_loader)
 
 def init_perm_query_strategy(train_loader, val_loader, test_loader):
     global QUERY_STRATEGY_IN_USE
