@@ -9,6 +9,8 @@ from sklearn.metrics import (
 )
 from sklearn.preprocessing import label_binarize
 from env import *
+import warnings
+warnings.filterwarnings("ignore", category=FutureWarning)
 
 class LeNet5(nn.Module):
     def __init__(self, device='cpu', dataset=DATASET_CIFAR_10, epochs=EPHOCS, lr=LEARNING_RATE, batch_size=BATCH_SIZE):
@@ -89,8 +91,8 @@ class LeNet5(nn.Module):
                 optimizer.step()
                 running_loss += loss.item()
 
-            avg_train_loss = running_loss / len(train_loader)
-            print(f"    Epoch [{epoch+1}/{self.epochs}] - Train Loss: {avg_train_loss:.4f}")
+            #avg_train_loss = running_loss / len(train_loader)
+            #print(f"    Epoch [{epoch+1}/{self.epochs}] - Train Loss: {avg_train_loss:.4f}")
 
         return self
 

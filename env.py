@@ -35,8 +35,11 @@ MODELS= os.path.join(BASE_DIR, "models")
 
 ## Active Learning Configuration
 CLASSES = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
-NUM_CYCLES = 600
+NUM_CYCLES = 50
 NUM_ANNOTATORS = 30
+POOL_SIZE = 16
+
+
 
 ORACLE_ANSWER_RANDOM = "random"
 ORACLE_ANSWER_REPUTATION = "reputation"

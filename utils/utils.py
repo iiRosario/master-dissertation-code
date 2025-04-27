@@ -139,6 +139,10 @@ def extract_data(loader):
 
 
 
+
+    
+
+
 def write_metrics_to_csv(csv_path, csv_name, cycle, oracle_label, ground_truth_label, metrics):
     fieldnames = ["cycle", "accuracy_per_class", "precision_per_class", 
                   "recall_per_class", "f1_score_per_class", "sensitivity_per_class",
@@ -237,7 +241,10 @@ def plot_all_metrics_over_cycles(csv_path, plot_path, seed):
 
 
 
-
+def avg_metric(metrics, variable):
+    variable_list = [float(a) for a in metrics[variable]]
+    avg_variable = sum(variable_list) / len(variable_list)
+    return avg_variable
 
 ############################### DATA AUGMENTATION ###############################
 # Função para adicionar ruído aos dados de entrada
