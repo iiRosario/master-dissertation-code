@@ -66,7 +66,7 @@ def init_active_learning(train_loader, val_loader, test_loader, seed):
     plot_distribution_2(Counter(y_init_train.tolist()), "init_train", CLASS_COLORS, plots_path)
     plot_distribution_2(Counter(y_rest_train.tolist()), "rest_train", CLASS_COLORS, plots_path)
 
-    model = LeNet5(dataset=DATASET_IN_USE).to(device)
+    model = LeNet5(device=device, dataset=DATASET_IN_USE).to(device)
     learner = ActiveLearner(
         estimator = model,
         query_strategy=QUERY_STRATEGY_IN_USE,

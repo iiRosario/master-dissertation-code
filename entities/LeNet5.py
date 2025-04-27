@@ -62,16 +62,15 @@ class LeNet5(nn.Module):
         optimizer = torch.optim.Adam(self.parameters(), lr=self.lr)
 
         if isinstance(X, torch.Tensor):
-            X_tensor = X.clone().detach().float()
+            X_tensor = X.clone().detach().float().to(self.device)
         else:
             raise TypeError("Input X must be a torch tensor")
 
-        
         if X_tensor.dim() != 4 and X_tensor.dim() != 3:
-             raise ValueError(f"Unexpected input shape: {X_tensor.shape}\nInput X must have at least 3 dimensions (C, H, W).")
+            raise ValueError(f"Unexpected input shape: {X_tensor.shape}\nInput X must have at least 3 dimensions (C, H, W).")
 
         if isinstance(y, torch.Tensor):
-            y_tensor = y.clone().detach().long()
+            y_tensor = y.clone().detach().long().to(self.device)
         else:
             raise TypeError("Input y must be a torch tensor")
 
