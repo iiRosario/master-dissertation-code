@@ -15,8 +15,8 @@ from collections import Counter
 from utils.DataManager import *
 from utils.utils import *
     
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-#device = "cpu"
+#device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+device = "cpu"
 
 print("Using device:", device)
 
