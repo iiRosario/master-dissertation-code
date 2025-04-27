@@ -198,7 +198,7 @@ def init_active_learning(train_loader, val_loader, test_loader, seed):
             oracle_label = oracle.random_answer()
             target = torch.tensor([oracle_label])
 
-        learner.teach(X=query_image, y=target, only_new=True)
+        learner.teach(X=query_image, y=target)
         
         x_rest_train = np.delete(x_rest_train, query_idx, axis=0)
         y_rest_train = np.delete(y_rest_train, query_idx, axis=0)
