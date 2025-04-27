@@ -1,4 +1,5 @@
 import numpy as np
+import os
 import matplotlib.pyplot as plt
 import torch
 from torch.utils.data import Subset
@@ -9,6 +10,9 @@ import pandas as pd
 from torchvision.transforms import functional as F
 from matplotlib.ticker import MaxNLocator
 import matplotlib.cm as cm
+
+CLASS_COLORS = ['royalblue', 'tomato', 'goldenrod','mediumseagreen', 'orchid', 'slateblue',  'darkorange', 'turquoise', 'firebrick', 'deeppink']
+
 
 def get_label_distribution(dataset):
     labels = [dataset[i][1] for i in range(len(dataset))]
@@ -34,7 +38,7 @@ def plot_distribution(distribution, split_name, save_path='.', colors=CLASS_COLO
     plt.close()
     print(f"Saved: {full_path}")
 
-def plot_distribution_2(distribution, split_name, colors=None, save_path='.'):
+def plot_distribution_2(distribution, split_name, colors=CLASS_COLORS, save_path='.'):
     classes = sorted(distribution.keys())
     counts = [distribution[c] for c in classes]
 
@@ -259,3 +263,13 @@ def add_bidirectional_rotation(dataset, angle=25):
         augmented_data.append((rotated_left, label))
 
     return augmented_data
+
+
+
+
+## ACTIVE LEARNING
+
+def random_sampling(classifier, X_pool):
+    n_samples = len(X_pool)
+    query_idx = np.random.choice(range(n_samples))
+    return query_idx, X_pool[query_idx]

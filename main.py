@@ -29,8 +29,10 @@ def create_results_dir():
         results_dir_name = f"margin_sampling"
     elif QUERY_STRATEGY_IN_USE == entropy_sampling:
         results_dir_name = f"entropy_sampling"
-    else:
+    elif QUERY_STRATEGY_IN_USE == uncertainty_sampling:
         results_dir_name = f"uncertainty_sampling"
+    else:
+        results_dir_name = f"random_sampling"
     
     results_dir_path = os.path.join(RESULTS_PATH, DATASET_IN_USE, ORACLE_ANSWER_IN_USE, results_dir_name)
     os.makedirs(results_dir_path, exist_ok=True)
@@ -38,7 +40,7 @@ def create_results_dir():
     return results_dir_path
 
 
-# Active learning loop
+
 def init_active_learning(train_loader, val_loader, test_loader, seed):
     #CREATE RESULTS DIR
     results_path = create_results_dir()
@@ -65,10 +67,10 @@ def init_active_learning(train_loader, val_loader, test_loader, seed):
     plot_distribution_2(Counter(y_rest_train.tolist()), "rest_train", CLASS_COLORS, plots_path)
 
     model = LeNet5(dataset=DATASET_IN_USE).to(device)
-    model = model.init_fit(x_init_train, y_init_train)
     learner = ActiveLearner(
         estimator = model,
-        query_strategy=QUERY_STRATEGY_IN_USE
+        query_strategy=QUERY_STRATEGY_IN_USE,
+        X_training=x_init_train, y_training=y_init_train
     )
     
     init_results = learner.estimator.evaluate(x_val, y_val)    
@@ -82,10 +84,11 @@ def init_active_learning(train_loader, val_loader, test_loader, seed):
         print("==========================")
         print(f"Cycle {cycle + 1}/{NUM_CYCLES}")
 
+       
         query_idx, query_instance = learner.query(x_rest_train)
         query_image = x_rest_train[query_idx]
         true_label = y_rest_train[query_idx]
-        
+       
         if(ORACLE_ANSWER_IN_USE == ORACLE_ANSWER_REPUTATION):
             continue
         elif(ORACLE_ANSWER_IN_USE == ORACLE_ANSWER_GROUND_TRUTH):
@@ -96,7 +99,7 @@ def init_active_learning(train_loader, val_loader, test_loader, seed):
             target = torch.tensor([oracle_label])
 
         learner.teach(X=query_image, y=target)
-
+        
         x_rest_train = np.delete(x_rest_train, query_idx, axis=0)
         y_rest_train = np.delete(y_rest_train, query_idx, axis=0)
 
@@ -104,6 +107,7 @@ def init_active_learning(train_loader, val_loader, test_loader, seed):
         y_train_labeled.append(true_label)
 
         if(cycle + 1 == NUM_CYCLES):
+            print("FINAL CYCLE")
             metrics = learner.estimator.evaluate(x_test, y_test)    
         else:
             metrics = learner.estimator.evaluate(x_val, y_val)    
@@ -115,7 +119,8 @@ def init_active_learning(train_loader, val_loader, test_loader, seed):
     plot_all_metrics_over_cycles(csv_path=csv_path, plot_path=plots_path, seed=seed)
     
 
-    print("DONE! for seed: ", seed)
+    print("DONE! for seed: ", seed) 
+
 
 
 
@@ -136,19 +141,19 @@ def init_perm_statistic(train_loader, val_loader, test_loader):
 
 def init_perm_oracle_answer(train_loader, val_loader, test_loader):
     global ORACLE_ANSWER_IN_USE
-    #for ORACLE_ANSWER_IN_USE in ORACLE_ANSWERS:
-    #    init_perm_statistic(train_loader=train_loader, val_loader=val_loader, test_loader=test_loader)
+    for ORACLE_ANSWER_IN_USE in ORACLE_ANSWERS:
+        init_perm_statistic(train_loader=train_loader, val_loader=val_loader, test_loader=test_loader)
 
-    ORACLE_ANSWER_IN_USE = ORACLE_ANSWER_GROUND_TRUTH
-    init_perm_statistic(train_loader=train_loader, val_loader=val_loader, test_loader=test_loader)
+    #ORACLE_ANSWER_IN_USE = ORACLE_ANSWER_RANDOM
+    #init_perm_statistic(train_loader=train_loader, val_loader=val_loader, test_loader=test_loader)
 
 def init_perm_query_strategy(train_loader, val_loader, test_loader):
     global QUERY_STRATEGY_IN_USE
-    #for QUERY_STRATEGY_IN_USE in QUERY_STRATEGIES:
-    #    init_perm_oracle_answer(train_loader=train_loader, val_loader=val_loader, test_loader=test_loader)
+    for QUERY_STRATEGY_IN_USE in QUERY_STRATEGIES:
+        init_perm_oracle_answer(train_loader=train_loader, val_loader=val_loader, test_loader=test_loader)
    
-    QUERY_STRATEGY_IN_USE = UNCERTAINTY_SAMPLING
-    init_perm_oracle_answer(train_loader=train_loader, val_loader=val_loader, test_loader=test_loader)
+    #QUERY_STRATEGY_IN_USE = ENTROPY_SAMPLING
+    #init_perm_oracle_answer(train_loader=train_loader, val_loader=val_loader, test_loader=test_loader)
 
 
 def main():

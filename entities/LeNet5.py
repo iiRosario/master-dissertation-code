@@ -1,10 +1,8 @@
 import torch
 import torch.nn as nn
-import os
 import numpy as np
 from torch.utils.data import TensorDataset, DataLoader
-from collections import Counter
-import torch.nn.functional as F
+import torch.nn.functional as Fnn
 from sklearn.metrics import (
     precision_score, recall_score, f1_score, confusion_matrix,
     accuracy_score, roc_auc_score, roc_curve, log_loss
@@ -47,55 +45,17 @@ class LeNet5(nn.Module):
         self.to(self.device)
 
     def forward(self, x):
-        x = self.pool(F.relu(self.conv1(x)))  # Conv1 + ReLU + Pooling
-        x = self.pool(F.relu(self.conv2(x)))  # Conv2 + ReLU + Pooling
+        x = self.pool(Fnn.relu(self.conv1(x)))  # Conv1 + ReLU + Pooling
+        x = self.pool(Fnn.relu(self.conv2(x)))  # Conv2 + ReLU + Pooling
         x = x.view(x.size(0), -1)
-        x = F.relu(self.fc1(x))
+        x = Fnn.relu(self.fc1(x))
         x = self.dropout(x)  # Aplica o Dropout após a primeira camada fully connected
-        x = F.relu(self.fc2(x))
+        x = Fnn.relu(self.fc2(x))
         x = self.dropout(x)  # Aplica o Dropout após a segunda camada fully connected
         x = self.fc3(x)
         return x
 
-    def init_fit(self, X, y, epochs=INIT_EPHOCS):
-        self.train()
-        criterion = nn.CrossEntropyLoss()
-        optimizer = torch.optim.Adam(self.parameters(), lr=self.lr)
-
-        if isinstance(X, torch.Tensor):
-            X_tensor = X.clone().detach().float()
-        else:
-            raise TypeError("Input X must be a torch tensor")
-
-        
-        if X_tensor.dim() != 4 and X_tensor.dim() != 3:
-             raise ValueError(f"Unexpected input shape: {X_tensor.shape}\nInput X must have at least 3 dimensions (C, H, W).")
-
-        if isinstance(y, torch.Tensor):
-            y_tensor = y.clone().detach().long()
-        else:
-            raise TypeError("Input y must be a torch tensor")
-
-
-        dataset = TensorDataset(X_tensor, y_tensor)
-        train_loader = DataLoader(dataset, batch_size=self.batch_size, shuffle=True)
-
-        for epoch in range(epochs):
-            running_loss = 0.0
-            for images, labels in train_loader:
-                images, labels = images.to(self.device), labels.to(self.device)
-                optimizer.zero_grad()
-                outputs = self(images)
-                loss = criterion(outputs, labels)
-                loss.backward()
-                optimizer.step()
-                running_loss += loss.item()
-
-            avg_train_loss = running_loss / len(train_loader)
-            print(f"    Epoch [{epoch+1}/{epochs}] - Train Loss: {avg_train_loss:.4f}")
-
-        return self
-
+    
     def fit(self, X, y):
         self.train()
         criterion = nn.CrossEntropyLoss()
@@ -160,7 +120,7 @@ class LeNet5(nn.Module):
             
             X_tensor = X_tensor.to(self.device)
             outputs = self(X_tensor)
-            probabilities = F.softmax(outputs, dim=1)
+            probabilities = Fnn.softmax(outputs, dim=1)
         
         return probabilities.cpu().numpy()
 
@@ -196,7 +156,7 @@ class LeNet5(nn.Module):
                 labels = labels.to(self.device)
 
                 outputs = self(images)
-                probs = F.softmax(outputs, dim=1)
+                probs = Fnn.softmax(outputs, dim=1)
                 _, preds = torch.max(probs, 1)
 
                 all_preds.extend(preds.cpu().numpy())
