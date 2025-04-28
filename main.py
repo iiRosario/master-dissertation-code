@@ -107,7 +107,6 @@ def init_active_learning_pool(train_loader, val_loader, test_loader, seed):
             oracle_labels = true_labels
         else:
             answers = oracle.random_answer(n=POOL_SIZE)
-            print(answers)
             oracle_labels = torch.tensor(answers, dtype=true_labels.dtype)
 
 
