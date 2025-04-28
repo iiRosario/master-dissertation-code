@@ -313,7 +313,15 @@ def main():
     
     
 
+def test_oracle():
+    committee = Committee(size=30, seed=0)
+    annotators = committee.annotators
+    for annotator in annotators:
+        print(annotator)
+
+
 if __name__ == "__main__":
-    main() 
+    test_oracle()
+    #main() 
 
     
