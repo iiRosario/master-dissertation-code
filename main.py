@@ -25,6 +25,7 @@ print("Using device:", device)
 DATASET_IN_USE = "None"
 QUERY_STRATEGY_IN_USE = "None"
 ORACLE_ANSWER_IN_USE = "None"
+EXPERTISE_IN_USE = "None"
 
 def create_results_dir():
     if QUERY_STRATEGY_IN_USE == margin_sampling:
@@ -42,7 +43,21 @@ def create_results_dir():
     return results_dir_path
 
 
-
+def select_answer_type(oracle, true_labels):
+    answer_methods = {
+        ORACLE_ANSWER_REPUTATION: oracle.weight_reputation_answer,
+        ORACLE_ANSWER_MAJORITY_VOTING: oracle.majority_voting_answer,
+        ORACLE_ANSWER_RANDOM: oracle.random_answer,
+    }
+    
+    if ORACLE_ANSWER_IN_USE in answer_methods:
+        answer_method = answer_methods[ORACLE_ANSWER_IN_USE]
+        answers = [answer_method(true_target=label.item()) for label in true_labels]
+        oracle_labels = torch.tensor(answers, dtype=true_labels.dtype)
+    else:
+        oracle_labels = true_labels
+    
+    return oracle_labels
 
 def init_active_learning_pool(train_loader, val_loader, test_loader, seed):
     # --- setup de diretórios e CSV ---
@@ -89,7 +104,7 @@ def init_active_learning_pool(train_loader, val_loader, test_loader, seed):
                          metrics=init_metrics)
 
 
-    oracle = Committee(annotators=[], seed=seed)
+    oracle = Committee(size=30, seed=seed, expertise=EXPERTISE_IN_USE)
     # --- loop de Active Learning em batch ---
     for cycle in range(NUM_CYCLES):
         print(f"========================\nCycle {cycle + 1}/{NUM_CYCLES}")
@@ -101,14 +116,7 @@ def init_active_learning_pool(train_loader, val_loader, test_loader, seed):
         x_query = x_unlabeled[query_idx]
         true_labels = y_unlabeled[query_idx]
 
-        if(ORACLE_ANSWER_IN_USE == ORACLE_ANSWER_REPUTATION):
-            continue
-        elif(ORACLE_ANSWER_IN_USE == ORACLE_ANSWER_GROUND_TRUTH):
-            oracle_labels = true_labels
-        else:
-            answers = oracle.random_answer(n=POOL_SIZE)
-            oracle_labels = torch.tensor(answers, dtype=true_labels.dtype)
-
+        oracle_labels = select_answer_type(oracle, true_labels)
 
         learner.teach(X=x_query, y=oracle_labels)
         
@@ -143,92 +151,16 @@ def init_active_learning_pool(train_loader, val_loader, test_loader, seed):
     print("Done for seed:", seed)
 
 
-""" def init_active_learning(train_loader, val_loader, test_loader, seed):
-    #CREATE RESULTS DIR
-    results_path = create_results_dir()
-    plots_path = os.path.join(results_path, "plots")
-    os.makedirs(plots_path, exist_ok=True)
-    results_file_name = f"results_{seed}.csv"
-    results_csv_path = os.path.join(results_path, results_file_name)
-    if os.path.exists(results_csv_path): os.remove(results_csv_path)
-
-    # Obter x_train, y_train, x_val, y_val, x_test, y_test
-    x_train, y_train = extract_data(train_loader)
-    x_val, y_val = extract_data(val_loader)
-    x_test, y_test = extract_data(test_loader)
-
-    torch.manual_seed(seed)  
-    indices = torch.randperm(len(x_train))  # Shuffle reprodutível
-    x_train = x_train[indices]
-    y_train = y_train[indices]
-    
-    x_init_train, x_rest_train, y_init_train, y_rest_train = train_test_split(x_train, y_train, train_size=INIT_TRAINING_PERCENTAGE, stratify=y_train, random_state=seed)
-
-    
-    plot_distribution_2(Counter(y_init_train.tolist()), "init_train", CLASS_COLORS, plots_path)
-    plot_distribution_2(Counter(y_rest_train.tolist()), "rest_train", CLASS_COLORS, plots_path)
-
-    model = LeNet5(device=device, dataset=DATASET_IN_USE).to(device)
-    learner = ActiveLearner(
-        estimator = model,
-        query_strategy=QUERY_STRATEGY_IN_USE,
-        X_training=x_init_train, y_training=y_init_train
-    )
-    
-    init_results = learner.estimator.evaluate(x_val, y_val)    
-    write_metrics_to_csv(csv_path=results_path, csv_name=results_file_name, cycle=0, oracle_label=-1, ground_truth_label=-1, metrics=init_results)
-    
-    oracle = Committee(annotators=[], seed=seed)
-
-    for cycle in range(NUM_CYCLES):
-        print("==========================")
-        print(f"Cycle {cycle + 1}/{NUM_CYCLES}")
-
-       
-        query_idx, query_instance = learner.query(x_rest_train)
-        query_image = x_rest_train[query_idx]
-        true_label = y_rest_train[query_idx]
-       
-        if(ORACLE_ANSWER_IN_USE == ORACLE_ANSWER_REPUTATION):
-            continue
-        elif(ORACLE_ANSWER_IN_USE == ORACLE_ANSWER_GROUND_TRUTH):
-            oracle_label = true_label.item()
-            target = torch.tensor([oracle_label])
-        else:
-            oracle_label = oracle.random_answer()
-            target = torch.tensor([oracle_label])
-
-        learner.teach(X=query_image, y=target)
-        
-        x_rest_train = np.delete(x_rest_train, query_idx, axis=0)
-        y_rest_train = np.delete(y_rest_train, query_idx, axis=0)
-
-        if(cycle + 1 == NUM_CYCLES):
-            print("FINAL CYCLE")
-            metrics = learner.estimator.evaluate(x_test, y_test)    
-        else:
-            metrics = learner.estimator.evaluate(x_val, y_val)    
-
-        print(f"AVG Accuracy: {avg_metric(metrics, 'accuracy_per_class'):.4f} | AVG Precision: {avg_metric(metrics, 'precision_per_class'):.4f}")
-
-        write_metrics_to_csv(csv_path=results_path, csv_name=results_file_name, cycle=cycle+1, oracle_label=oracle_label, ground_truth_label=true_label.item(), metrics=metrics)
-    
-    
-    csv_path = os.path.join(results_path, results_file_name)
-    plot_all_metrics_over_cycles(csv_path=csv_path, plot_path=plots_path, seed=seed)
-    
-
-    print("DONE! for seed: ", seed)  """
-
-
-
 
 def init_perm_statistic(train_loader, val_loader, test_loader):
+    global EXPERTISE_IN_USE
+    EXPERTISE_IN_USE = HIGH_EXPERTISE
     for seed in range(30):
         print(f"\n\n\n========== AL =============")
         print(f"Dataset: {DATASET_IN_USE}")
         print(f"Query Strategy: {QUERY_STRATEGY_IN_USE}")
         print(f"Oracle Answer: {ORACLE_ANSWER_IN_USE}")
+        print(f"Annotator Expertise: {EXPERTISE_IN_USE}")
         print(f"Learning Rate: {LEARNING_RATE}")
         print(f"Epochs: {EPHOCS}")
         print(f"Init training (%): {INIT_TRAINING_PERCENTAGE * 100}%")
@@ -242,7 +174,7 @@ def init_perm_oracle_answer(train_loader, val_loader, test_loader):
     #for ORACLE_ANSWER_IN_USE in ORACLE_ANSWERS:
     #    init_perm_statistic(train_loader=train_loader, val_loader=val_loader, test_loader=test_loader)
 
-    ORACLE_ANSWER_IN_USE = ORACLE_ANSWER_GROUND_TRUTH
+    ORACLE_ANSWER_IN_USE = ORACLE_ANSWER_REPUTATION
     init_perm_statistic(train_loader=train_loader, val_loader=val_loader, test_loader=test_loader)
 
 def init_perm_query_strategy(train_loader, val_loader, test_loader):
@@ -313,16 +245,17 @@ def main():
     
 def test_oracle():
     committee = Committee(size=30, seed=0)
-   
     
-    for i in range(1):
-        print("=======================================================")
+    for i in range(128*250):
+        #print("=======================================================")
         true_label = i % len(CLASSES)
-        ans = committee.weight_reputation_answer(true_target=true_label)
-        print(f"True Label: {true_label}  Oracle Label: {ans}")
+        ans = committee.random_answer(true_target=true_label)
+        
+    print(committee.repr_cm())
+    committee.compute_and_print_metrics()
 
 if __name__ == "__main__":
-    test_oracle()
-    #main() 
+    #test_oracle()
+    main() 
 
     

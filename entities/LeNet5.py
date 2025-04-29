@@ -9,8 +9,7 @@ from sklearn.metrics import (
 )
 from sklearn.preprocessing import label_binarize
 from env import *
-import warnings
-warnings.filterwarnings("ignore", category=FutureWarning)
+
 
 class LeNet5(nn.Module):
     def __init__(self, device='cpu', dataset=DATASET_CIFAR_10, epochs=EPHOCS, lr=LEARNING_RATE, batch_size=BATCH_SIZE):
