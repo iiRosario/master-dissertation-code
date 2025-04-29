@@ -37,7 +37,10 @@ def create_results_dir():
     else:
         results_dir_name = f"random_sampling"
     
-    results_dir_path = os.path.join(RESULTS_PATH, DATASET_IN_USE, ORACLE_ANSWER_IN_USE, results_dir_name)
+    if(ORACLE_ANSWER_IN_USE == ORACLE_ANSWER_REPUTATION or ORACLE_ANSWER_MAJORITY_VOTING):
+        results_dir_path = os.path.join(RESULTS_PATH, DATASET_IN_USE, ORACLE_ANSWER_IN_USE, EXPERTISE_IN_USE, results_dir_name)
+    else:
+        results_dir_path = os.path.join(RESULTS_PATH, DATASET_IN_USE, ORACLE_ANSWER_IN_USE, results_dir_name)
     os.makedirs(results_dir_path, exist_ok=True)
     
     return results_dir_path
@@ -99,12 +102,10 @@ def init_active_learning_pool(train_loader, val_loader, test_loader, seed):
 
     # Avaliação inicial
     init_metrics = learner.estimator.evaluate(x_val, y_val)
-    write_metrics_to_csv(results_path, results_file, cycle=0,
-                         oracle_label=-1, ground_truth_label=-1,
-                         metrics=init_metrics)
-
+    write_metrics_to_csv(results_path, results_file, cycle=0, oracle_label=-1, ground_truth_label=-1,  metrics=init_metrics,                         oracle_cm=-1, oracle_iterations=-1)
 
     oracle = Committee(size=30, seed=seed, expertise=EXPERTISE_IN_USE)
+    
     # --- loop de Active Learning em batch ---
     for cycle in range(NUM_CYCLES):
         print(f"========================\nCycle {cycle + 1}/{NUM_CYCLES}")
@@ -144,7 +145,9 @@ def init_active_learning_pool(train_loader, val_loader, test_loader, seed):
         write_metrics_to_csv(results_path, results_file,  cycle=cycle+1,
                              oracle_label=list_oracle_labels,  # se usar oracle diferente, modifique aqui
                              ground_truth_label=list_true_labels,
-                             metrics=metrics)
+                             metrics=metrics,
+                             oracle_cm=oracle.cm,
+                             oracle_iterations=oracle.labeling_iteration)
 
     # --- pós-processamento ---
     plot_all_metrics_over_cycles(csv_path, plots_path, seed)
@@ -153,8 +156,7 @@ def init_active_learning_pool(train_loader, val_loader, test_loader, seed):
 
 
 def init_perm_statistic(train_loader, val_loader, test_loader):
-    global EXPERTISE_IN_USE
-    EXPERTISE_IN_USE = VERY_HIGH_EXPERTISE
+    
     for seed in range(30):
         print(f"\n\n\n========== AL =============")
         print(f"Dataset: {DATASET_IN_USE}")
@@ -171,11 +173,19 @@ def init_perm_statistic(train_loader, val_loader, test_loader):
 
 def init_perm_oracle_answer(train_loader, val_loader, test_loader):
     global ORACLE_ANSWER_IN_USE
-    #for ORACLE_ANSWER_IN_USE in ORACLE_ANSWERS:
-    #    init_perm_statistic(train_loader=train_loader, val_loader=val_loader, test_loader=test_loader)
+    global EXPERTISE_IN_USE
+    
+    for ORACLE_ANSWER_IN_USE in ORACLE_ANSWERS:
+        if(ORACLE_ANSWER_IN_USE == ORACLE_ANSWER_REPUTATION or ORACLE_ANSWER_MAJORITY_VOTING):
+            
+            for EXPERTISE_IN_USE in EXPERTISES:
+                init_perm_statistic(train_loader=train_loader, val_loader=val_loader, test_loader=test_loader)
+        else:
+            init_perm_statistic(train_loader=train_loader, val_loader=val_loader, test_loader=test_loader)
 
-    ORACLE_ANSWER_IN_USE = ORACLE_ANSWER_REPUTATION
-    init_perm_statistic(train_loader=train_loader, val_loader=val_loader, test_loader=test_loader)
+            
+    #ORACLE_ANSWER_IN_USE = ORACLE_ANSWER_REPUTATION
+    #init_perm_statistic(train_loader=train_loader, val_loader=val_loader, test_loader=test_loader)
 
 def init_perm_query_strategy(train_loader, val_loader, test_loader):
     global QUERY_STRATEGY_IN_USE
@@ -244,15 +254,18 @@ def main():
 
     
 def test_oracle():
-    committee = Committee(size=30, seed=0)
+    committee = Committee(size=30, seed=30, expertise=HIGH_EXPERTISE)
     
-    for i in range(128*250):
+    """ for i in range(30):
         #print("=======================================================")
         true_label = i % len(CLASSES)
         ans = committee.random_answer(true_target=true_label)
         
     print(committee.repr_cm())
-    committee.compute_and_print_metrics()
+    committee.compute_and_print_metrics() """
+
+    for ann in committee.annotators:
+        print(ann.repr_cm_prob())
 
 if __name__ == "__main__":
     #test_oracle()

@@ -143,11 +143,12 @@ def extract_data(loader):
     
 
 
-def write_metrics_to_csv(csv_path, csv_name, cycle, oracle_label, ground_truth_label, metrics):
+def write_metrics_to_csv(csv_path, csv_name, cycle, oracle_label, ground_truth_label, metrics, oracle_cm, oracle_iterations):
     fieldnames = ["cycle", "accuracy_per_class", "precision_per_class", 
                   "recall_per_class", "f1_score_per_class", "sensitivity_per_class",
                   "specificity_per_class", "confusion_matrix", 
-                  "oracle_label", "ground_truth_label"]
+                  "oracle_label", "ground_truth_label", 
+                  "oracle_confusion_matrix", "oracle_iterations"]
 
     
     # Caminho completo para o ficheiro
@@ -171,7 +172,9 @@ def write_metrics_to_csv(csv_path, csv_name, cycle, oracle_label, ground_truth_l
             "specificity_per_class": metrics["specificity_per_class"],
             "confusion_matrix": metrics["confusion_matrix"],
             "oracle_label": oracle_label,
-            "ground_truth_label": ground_truth_label
+            "ground_truth_label": ground_truth_label,
+            "oracle_confusion_matrix": oracle_cm,
+            "oracle_iterations": oracle_iterations
         })
 
     

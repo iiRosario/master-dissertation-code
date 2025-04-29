@@ -27,6 +27,8 @@ class Annotator:
             self.cm_prob = self.init_cm_prob_medium()
         elif(self.expertise == HIGH_EXPERTISE):
             self.cm_prob = self.init_cm_prob_high()
+        elif(self.expertise == VERY_HIGH_EXPERTISE):
+            self.cm_prob = self.init_cm_prob_very_high()
         
         self.cm = np.zeros((self.num_classes, self.num_classes))
 
@@ -123,6 +125,17 @@ class Annotator:
         self.current_answer = ans         # Save the answer
         return ans
         
+    def rate(self, other):
+        result = 0
+        if self.current_answer != other.current_answer:
+            result = NEGATIVE_RATING
+        else:
+            result = POSITIVE_RATING
+        other.rating_scores[other.current_answer] += result
+        return result
+
+    def rating_score_value(self, score_i, n_annotators, labeling_iteration):
+        return (self.rating_scores[score_i] / (n_annotators*labeling_iteration))
 
 
     def update_reputation_per_class(self, N, iteration):
@@ -135,8 +148,6 @@ class Annotator:
         return self.reputations
 
 
-    def rating_score_value(self, score_i, n_annotators, labeling_iteration):
-        return (self.rating_scores[score_i] / (n_annotators*labeling_iteration))
 
 
     def update_accuracy(self):
@@ -157,16 +168,6 @@ class Annotator:
         
         return
 
-
-    def rate(self, other):
-        result = 0
-        if self.current_answer != other.current_answer:
-            result = NEGATIVE_RATING
-        else:
-            result = POSITIVE_RATING
-        other.rating_scores[other.current_answer] += result
-        return result
-       
 
     def accuracy_class(self):
         accuracy = np.zeros(self.num_classes)
