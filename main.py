@@ -311,14 +311,15 @@ def main():
         init_perm_query_strategy(train_loader=train_loader, val_loader=val_loader, test_loader=test_loader)
 
     
-    
-
 def test_oracle():
     committee = Committee(size=30, seed=0)
-    annotators = committee.annotators
-    for annotator in annotators:
-        print(annotator)
-
+   
+    
+    for i in range(1):
+        print("=======================================================")
+        true_label = i % len(CLASSES)
+        ans = committee.weight_reputation_answer(true_target=true_label)
+        print(f"True Label: {true_label}  Oracle Label: {ans}")
 
 if __name__ == "__main__":
     test_oracle()
