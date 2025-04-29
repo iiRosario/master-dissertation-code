@@ -254,7 +254,7 @@ def main():
 
     
 def test_oracle():
-    committee = Committee(size=30, seed=30, expertise=HIGH_EXPERTISE)
+    committee = Committee(size=30, seed=30, expertise=LOW_EXPERTISE)
     
     """ for i in range(30):
         #print("=======================================================")
@@ -268,7 +268,7 @@ def test_oracle():
         print(ann.repr_cm_prob())
 
 if __name__ == "__main__":
-    test_oracle()
-    #main() 
+    #test_oracle()
+    main() 
 
     

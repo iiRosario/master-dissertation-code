@@ -22,13 +22,13 @@ class Annotator:
         
         # If alphas not provided, set a default: higher value for correct label
         if(self.expertise == LOW_EXPERTISE):
-            self.cm_prob = self.init_cm_prob(self, target_accuracy=0.5, scale=20.0)
+            self.cm_prob = self.init_cm_prob(target_accuracy=0.5, scale=20.0)
         elif(self.expertise == MEDIUM_EXPERTISE):
-            self.cm_prob = self.init_cm_prob(self, target_accuracy=0.6, scale=20.0)
+            self.cm_prob = self.init_cm_prob(target_accuracy=0.6, scale=20.0)
         elif(self.expertise == HIGH_EXPERTISE):
-            self.cm_prob = self.init_cm_prob(self, target_accuracy=0.7, scale=20.0)
+            self.cm_prob = self.init_cm_prob(target_accuracy=0.7, scale=20.0)
         elif(self.expertise == VERY_HIGH_EXPERTISE):
-            self.cm_prob = self.init_cm_prob(self, target_accuracy=0.8, scale=20.0)
+            self.cm_prob = self.init_cm_prob(target_accuracy=0.8, scale=20.0)
         
         self.cm = np.zeros((self.num_classes, self.num_classes))
 
@@ -74,49 +74,6 @@ class Annotator:
             cm_prob[true_class] = probs
         return cm_prob
     
-
-    def init_cm_prob_high(self):
-        alphas = [10.0 for _ in range(self.num_classes)]
-        cm_prob = np.zeros((self.num_classes, self.num_classes))
-        for true_class in range(self.num_classes):
-            # Build alpha vector for Dirichlet: high value for the correct class, low for others
-            alpha_vector = [1.0] * self.num_classes
-            alpha_vector[true_class] = alphas[true_class]  # Higher confidence in the true class
-           
-            cm_prob[true_class] = np.random.dirichlet(alpha_vector)
-        return cm_prob
-
-    def init_cm_prob_medium(self):
-        cm_prob = np.zeros((self.num_classes, self.num_classes))
-        for true_class in range(self.num_classes):
-            alpha_vector = [np.random.uniform(0.5, 2.0) for _ in range(self.num_classes)]
-            alpha_vector[true_class] = np.random.uniform(2.0, 4.0)  # Slight advantage
-            probs = np.random.dirichlet(alpha_vector)
-            probs = np.round(probs, 2)
-            
-            # Ajusta a linha para garantir soma = 1.0
-            diff = 1.0 - probs.sum()
-            max_index = np.argmax(probs)  # Corrige o maior valor (minimiza impacto)
-            probs[max_index] += diff
-            cm_prob[true_class] = probs
-        return cm_prob
-
-    def init_cm_prob_low(self):
-        cm_prob = np.zeros((self.num_classes, self.num_classes))
-        for true_class in range(self.num_classes):
-            base_alpha = np.random.uniform(0.5, 3.0)
-            alpha_vector = [np.random.uniform(0.5, 3.0) for _ in range(self.num_classes)]
-            alpha_vector[true_class] = base_alpha + np.random.uniform(0.0, 1.0)
-
-            probs = np.random.dirichlet(alpha_vector)
-            probs = np.round(probs, 2)
-
-            # Ajusta a linha para garantir soma = 1.0
-            diff = 1.0 - probs.sum()
-            max_index = np.argmax(probs)
-            probs[max_index] += diff
-            cm_prob[true_class] = probs
-        return cm_prob
 
 
     def answer(self, true_label):
