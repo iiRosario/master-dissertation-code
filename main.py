@@ -154,7 +154,7 @@ def init_active_learning_pool(train_loader, val_loader, test_loader, seed):
 
 def init_perm_statistic(train_loader, val_loader, test_loader):
     global EXPERTISE_IN_USE
-    EXPERTISE_IN_USE = HIGH_EXPERTISE
+    EXPERTISE_IN_USE = VERY_HIGH_EXPERTISE
     for seed in range(30):
         print(f"\n\n\n========== AL =============")
         print(f"Dataset: {DATASET_IN_USE}")

@@ -47,6 +47,31 @@ class Annotator:
         self.current_answer = -1
 
 
+
+    def init_cm_prob_very_high(self):
+        """
+        Inicializa uma matriz de confusão probabilística em que a classe verdadeira
+        tem aproximadamente 80% de chance de ser escolhida.
+        """
+        target_accuracy = 0.8
+        scale = 20.0  # Controla a concentração das distribuições
+
+        cm_prob = np.zeros((self.num_classes, self.num_classes))
+        for true_class in range(self.num_classes):
+            alpha_vector = [(1 - target_accuracy) / (self.num_classes - 1) * scale
+                            for _ in range(self.num_classes)]
+            alpha_vector[true_class] = target_accuracy * scale
+
+            probs = np.random.dirichlet(alpha_vector)
+            probs = np.round(probs, 2)
+
+            # Corrige para garantir que a soma seja exatamente 1.0
+            diff = 1.0 - probs.sum()
+            probs[np.argmax(probs)] += diff
+
+            cm_prob[true_class] = probs
+        return cm_prob
+
     def init_cm_prob_high(self):
         alphas = [10.0 for _ in range(self.num_classes)]
         cm_prob = np.zeros((self.num_classes, self.num_classes))
