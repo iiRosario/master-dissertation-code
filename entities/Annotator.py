@@ -22,13 +22,13 @@ class Annotator:
         
         # If alphas not provided, set a default: higher value for correct label
         if(self.expertise == LOW_EXPERTISE):
-            self.cm_prob = self.init_cm_prob_low()
+            self.cm_prob = self.init_cm_prob(self, target_accuracy=0.5, scale=20.0)
         elif(self.expertise == MEDIUM_EXPERTISE):
-            self.cm_prob = self.init_cm_prob_medium()
+            self.cm_prob = self.init_cm_prob(self, target_accuracy=0.6, scale=20.0)
         elif(self.expertise == HIGH_EXPERTISE):
-            self.cm_prob = self.init_cm_prob_high()
+            self.cm_prob = self.init_cm_prob(self, target_accuracy=0.7, scale=20.0)
         elif(self.expertise == VERY_HIGH_EXPERTISE):
-            self.cm_prob = self.init_cm_prob_very_high()
+            self.cm_prob = self.init_cm_prob(self, target_accuracy=0.8, scale=20.0)
         
         self.cm = np.zeros((self.num_classes, self.num_classes))
 
@@ -50,14 +50,14 @@ class Annotator:
 
 
 
-    def init_cm_prob_very_high(self):
+    def init_cm_prob(self, target_accuracy=0.8, scale=20.0):
         """
         Inicializa uma matriz de confusão probabilística em que a classe verdadeira
-        tem aproximadamente 80% de chance de ser escolhida.
+        tem aproximadamente target_accuracy de chance de ser escolhida.
+        
+        :param target_accuracy: Probabilidade média desejada de acerto (ex: 0.7 para 70%)
+        :param scale: Parâmetro de concentração da Dirichlet (quanto maior, menos variação)
         """
-        target_accuracy = 0.8
-        scale = 20.0  # Controla a concentração das distribuições
-
         cm_prob = np.zeros((self.num_classes, self.num_classes))
         for true_class in range(self.num_classes):
             alpha_vector = [(1 - target_accuracy) / (self.num_classes - 1) * scale
@@ -73,6 +73,7 @@ class Annotator:
 
             cm_prob[true_class] = probs
         return cm_prob
+    
 
     def init_cm_prob_high(self):
         alphas = [10.0 for _ in range(self.num_classes)]
@@ -81,7 +82,7 @@ class Annotator:
             # Build alpha vector for Dirichlet: high value for the correct class, low for others
             alpha_vector = [1.0] * self.num_classes
             alpha_vector[true_class] = alphas[true_class]  # Higher confidence in the true class
-            print(f"alpha_vector: {alpha_vector}")
+           
             cm_prob[true_class] = np.random.dirichlet(alpha_vector)
         return cm_prob
 

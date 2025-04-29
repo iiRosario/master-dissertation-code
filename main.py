@@ -268,7 +268,7 @@ def test_oracle():
         print(ann.repr_cm_prob())
 
 if __name__ == "__main__":
-    #test_oracle()
-    main() 
+    test_oracle()
+    #main() 
 
     
