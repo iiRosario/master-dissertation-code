@@ -26,8 +26,9 @@ DATASET_IN_USE = "None"
 QUERY_STRATEGY_IN_USE = "None"
 ORACLE_ANSWER_IN_USE = "None"
 EXPERTISE_IN_USE = "None"
+ORACLE_SIZE_IN_USE = 0
 
-def create_results_dir():
+def create_results_dir(seed):
     if QUERY_STRATEGY_IN_USE == margin_sampling:
         results_dir_name = f"margin_sampling"
     elif QUERY_STRATEGY_IN_USE == entropy_sampling:
@@ -38,35 +39,39 @@ def create_results_dir():
         results_dir_name = f"random_sampling"
     
     if(ORACLE_ANSWER_IN_USE == ORACLE_ANSWER_REPUTATION or ORACLE_ANSWER_MAJORITY_VOTING):
-        results_dir_path = os.path.join(RESULTS_PATH, DATASET_IN_USE, ORACLE_ANSWER_IN_USE, EXPERTISE_IN_USE, results_dir_name)
+        results_dir_path = os.path.join(RESULTS_PATH, DATASET_IN_USE, str(ORACLE_SIZE_IN_USE), ORACLE_ANSWER_IN_USE, EXPERTISE_IN_USE, results_dir_name, f"results_{seed}")
     else:
-        results_dir_path = os.path.join(RESULTS_PATH, DATASET_IN_USE, ORACLE_ANSWER_IN_USE, results_dir_name)
+        results_dir_path = os.path.join(RESULTS_PATH, DATASET_IN_USE, ORACLE_ANSWER_IN_USE, results_dir_name, f"results_{seed}")
+
     os.makedirs(results_dir_path, exist_ok=True)
-    
     return results_dir_path
 
 
 def select_answer_type(oracle, true_labels):
-    answer_methods = {
-        ORACLE_ANSWER_REPUTATION: oracle.weight_reputation_answer,
-        ORACLE_ANSWER_MAJORITY_VOTING: oracle.majority_voting_answer,
-        ORACLE_ANSWER_RANDOM: oracle.random_answer,
-    }
-    
-    if ORACLE_ANSWER_IN_USE in answer_methods:
-        answer_method = answer_methods[ORACLE_ANSWER_IN_USE]
-        answers = [answer_method(true_target=label.item()) for label in true_labels]
+
+    if(ORACLE_ANSWER_IN_USE != ORACLE_ANSWER_GROUND_TRUTH):
+        answers = []
+        for true_label in true_labels:
+            if(ORACLE_ANSWER_IN_USE == ORACLE_ANSWER_REPUTATION): 
+                ans = oracle.weight_reputation_answer(true_target=true_label)
+            elif(ORACLE_ANSWER_IN_USE == ORACLE_ANSWER_MAJORITY_VOTING):
+                ans = oracle.majority_voting_answer(true_target=true_label)
+            elif(ORACLE_ANSWER_IN_USE == ORACLE_ANSWER_RANDOM):
+                ans = oracle.random_answer(true_target=true_label)
+            answers.append(ans)
         oracle_labels = torch.tensor(answers, dtype=true_labels.dtype)
-    else:
+
+    elif(ORACLE_ANSWER_IN_USE == ORACLE_ANSWER_GROUND_TRUTH):
         oracle_labels = true_labels
     
     return oracle_labels
 
 def init_active_learning_pool(train_loader, val_loader, test_loader, seed):
     # --- setup de diretórios e CSV ---
-    results_path = create_results_dir()
+    results_path = create_results_dir(seed)
     plots_path = os.path.join(results_path, "plots")
     os.makedirs(plots_path, exist_ok=True)
+
     results_file = f"results_{seed}.csv"
     csv_path = os.path.join(results_path, results_file)
     if os.path.exists(csv_path):
@@ -102,9 +107,9 @@ def init_active_learning_pool(train_loader, val_loader, test_loader, seed):
 
     # Avaliação inicial
     init_metrics = learner.estimator.evaluate(x_val, y_val)
-    write_metrics_to_csv(results_path, results_file, cycle=0, oracle_label=-1, ground_truth_label=-1,  metrics=init_metrics,                         oracle_cm=-1, oracle_iterations=-1)
+    write_metrics_to_csv(results_path, results_file, cycle=0, oracle_label=-1, ground_truth_label=-1,  metrics=init_metrics, oracle_cm=-1, oracle_iterations=-1)
 
-    oracle = Committee(size=30, seed=seed, expertise=EXPERTISE_IN_USE)
+    oracle = Committee(size=ORACLE_SIZE_IN_USE, seed=seed, expertise=EXPERTISE_IN_USE, results_path=results_path)
     
     # --- loop de Active Learning em batch ---
     for cycle in range(NUM_CYCLES):
@@ -174,12 +179,15 @@ def init_perm_statistic(train_loader, val_loader, test_loader):
 def init_perm_oracle_answer(train_loader, val_loader, test_loader):
     global ORACLE_ANSWER_IN_USE
     global EXPERTISE_IN_USE
+    global ORACLE_SIZE_IN_USE
     
     for ORACLE_ANSWER_IN_USE in ORACLE_ANSWERS:
         if(ORACLE_ANSWER_IN_USE == ORACLE_ANSWER_REPUTATION or ORACLE_ANSWER_MAJORITY_VOTING):
-            
+            # L, M, H
             for EXPERTISE_IN_USE in EXPERTISES:
-                init_perm_statistic(train_loader=train_loader, val_loader=val_loader, test_loader=test_loader)
+                # 5, 15, 30
+                for ORACLE_SIZE_IN_USE in ORACLE_SIZES:
+                    init_perm_statistic(train_loader=train_loader, val_loader=val_loader, test_loader=test_loader)
         else:
             init_perm_statistic(train_loader=train_loader, val_loader=val_loader, test_loader=test_loader)
 
@@ -256,16 +264,16 @@ def main():
 def test_oracle():
     committee = Committee(size=30, seed=30, expertise=LOW_EXPERTISE)
     
-    """ for i in range(30):
+    for i in range(30):
         #print("=======================================================")
         true_label = i % len(CLASSES)
         ans = committee.random_answer(true_target=true_label)
         
     print(committee.repr_cm())
-    committee.compute_and_print_metrics() """
+    committee.compute_and_print_metrics()
 
-    for ann in committee.annotators:
-        print(ann.repr_cm_prob())
+    """ for ann in committee.annotators:
+        print(ann.repr_cm_prob()) """
 
 if __name__ == "__main__":
     #test_oracle()

@@ -1,13 +1,15 @@
 from entities.Annotator import Annotator
 from env import *
 import random
+import os
+import pandas as pd
 
 
 class Committee:
-    def __init__(self, size=30, seed=-1, expertise=HIGH_EXPERTISE):
+    def __init__(self, size=30, seed=-1, expertise=HIGH_EXPERTISE, results_path=None):
         self.seed = seed    
         random.seed(seed)
-        
+        self.results_path = results_path
         self.labeling_iteration = 0
 
         self.labeled_samples_class = [0 for _ in range(len(CLASSES))]
@@ -17,18 +19,20 @@ class Committee:
 
         self.annotators = []
         for i in range(size):
+            print(i)
             ann = Annotator(id=i, seed=seed+i, num_classes=len(CLASSES), alpha=0.5, beta=0.5, expertise=expertise)
             self.annotators.append(ann)
-            #print(ann.repr_cm_prob())
-
+    
 
     def update_metrics(self, answer, true_target):
         self.cm[true_target, answer] += 1
+        
 
     def random_answer(self, true_target):
         self.labeling_iteration += 1
         committee_answer = random.choice(CLASSES)
         self.update_metrics(answer=committee_answer, true_target=true_target)
+        self.write_annotators()
         return committee_answer
     
     def majority_voting_answer(self, true_target):
@@ -43,6 +47,7 @@ class Committee:
         committee_answer = votes.index(max(votes)) 
 
         self.update_metrics(answer=committee_answer, true_target=true_target)
+        self.write_annotators()
         return committee_answer 
 
     def weight_reputation_answer(self, true_target):
@@ -71,8 +76,8 @@ class Committee:
 
         committee_answer = sum_reputations.index(max(sum_reputations))
         self.update_metrics(answer=committee_answer, true_target=true_target)
+        self.write_annotators()
         return committee_answer
-
 
     def compute_and_print_metrics(self):
         """
@@ -134,6 +139,37 @@ class Committee:
         print(f"Average F1-Score: {avg_f1_score:.4f}")
         print("==============================\n")
 
+ 
+    def write_annotators(self):
+        folder = "Annotators"
+        output_dir = os.path.join(self.results_path, folder)
+        os.makedirs(output_dir, exist_ok=True)
+
+        for annotator in self.annotators:
+            print(f"writing annotator {annotator.id}")
+            filename = f"Annotator_{annotator.id}.csv"
+            full_path = os.path.join(output_dir, filename)
+            file_exists = os.path.isfile(full_path)
+
+            fieldnames = ["iteration", "cm", "reputations", "rating_scores"]
+
+            # Formatando as listas
+            cm_str = str(annotator.cm.tolist())
+            reputations_str = str([round(float(r), 2) for r in annotator.reputations])
+            rating_scores_str = str(annotator.rating_scores)
+
+            with open(full_path, mode='a', newline='') as csv_file:
+                writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
+
+                if not file_exists:
+                    writer.writeheader()
+
+                writer.writerow({
+                    "iteration": self.labeling_iteration,
+                    "cm": cm_str,
+                    "reputations": reputations_str,
+                    "rating_scores": rating_scores_str
+                })
 
     def __repr__(self):
         return (f"\nCommittee:\n"
