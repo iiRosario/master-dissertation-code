@@ -166,6 +166,7 @@ def init_perm_statistic(train_loader, val_loader, test_loader):
         print(f"\n\n\n========== AL =============")
         print(f"Dataset: {DATASET_IN_USE}")
         print(f"Query Strategy: {QUERY_STRATEGY_IN_USE}")
+        print(f"Oracle Size: {ORACLE_SIZE_IN_USE}")
         print(f"Oracle Answer: {ORACLE_ANSWER_IN_USE}")
         print(f"Annotator Expertise: {EXPERTISE_IN_USE}")
         print(f"Learning Rate: {LEARNING_RATE}")

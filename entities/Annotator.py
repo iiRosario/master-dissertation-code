@@ -75,7 +75,6 @@ class Annotator:
         return cm_prob
     
 
-
     def answer(self, true_label):
         probabilities = self.cm_prob[true_label]
         ans = np.random.choice(self.num_classes, p=probabilities)
@@ -125,7 +124,6 @@ class Annotator:
         self.avg_f1_score = np.mean(self.f1_scores)
         
         return
-
 
     def accuracy_class(self):
         accuracy = np.zeros(self.num_classes)
