@@ -19,7 +19,6 @@ class Committee:
 
         self.annotators = []
         for i in range(size):
-            print(i)
             ann = Annotator(id=i, seed=seed+i, num_classes=len(CLASSES), alpha=0.5, beta=0.5, expertise=expertise)
             self.annotators.append(ann)
     
@@ -146,7 +145,6 @@ class Committee:
         os.makedirs(output_dir, exist_ok=True)
 
         for annotator in self.annotators:
-            print(f"writing annotator {annotator.id}")
             filename = f"Annotator_{annotator.id}.csv"
             full_path = os.path.join(output_dir, filename)
             file_exists = os.path.isfile(full_path)

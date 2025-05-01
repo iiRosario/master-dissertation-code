@@ -15,6 +15,8 @@ from collections import Counter
 from utils.DataManager import *
 from utils.utils import *
 import warnings
+import argparse
+
 warnings.filterwarnings("ignore", category=FutureWarning)
     
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -32,16 +34,19 @@ def create_results_dir(seed):
     if QUERY_STRATEGY_IN_USE == margin_sampling:
         results_dir_name = f"margin_sampling"
     elif QUERY_STRATEGY_IN_USE == entropy_sampling:
-        results_dir_name = f"entropy_sampling"
+        query_strategy = f"entropy_sampling"
     elif QUERY_STRATEGY_IN_USE == uncertainty_sampling:
-        results_dir_name = f"uncertainty_sampling"
+        query_strategy = f"uncertainty_sampling"
     else:
-        results_dir_name = f"random_sampling"
+        query_strategy = f"random_sampling"
     
-    if(ORACLE_ANSWER_IN_USE == ORACLE_ANSWER_REPUTATION or ORACLE_ANSWER_MAJORITY_VOTING):
-        results_dir_path = os.path.join(RESULTS_PATH, DATASET_IN_USE, str(ORACLE_SIZE_IN_USE), ORACLE_ANSWER_IN_USE, EXPERTISE_IN_USE, results_dir_name, f"results_{seed}")
+    if ORACLE_ANSWER_IN_USE in (ORACLE_ANSWER_REPUTATION, ORACLE_ANSWER_MAJORITY_VOTING):
+        # runs/CIFAR/uncertainty_sampling/reputation_based/H/30/results_0
+        results_dir_path = os.path.join(RESULTS_PATH, DATASET_IN_USE, query_strategy, ORACLE_ANSWER_IN_USE, str(ORACLE_SIZE_IN_USE), EXPERTISE_IN_USE, f"results_{seed}")
+
     else:
-        results_dir_path = os.path.join(RESULTS_PATH, DATASET_IN_USE, ORACLE_ANSWER_IN_USE, results_dir_name, f"results_{seed}")
+        # runs/CIFAR/uncertainty_sampling/random_answer/results_0
+        results_dir_path = os.path.join(RESULTS_PATH, DATASET_IN_USE, query_strategy, ORACLE_ANSWER_IN_USE, f"results_{seed}")
 
     os.makedirs(results_dir_path, exist_ok=True)
     return results_dir_path
@@ -183,17 +188,17 @@ def init_perm_oracle_answer(train_loader, val_loader, test_loader):
     global ORACLE_SIZE_IN_USE
     
     for ORACLE_ANSWER_IN_USE in ORACLE_ANSWERS:
-        if(ORACLE_ANSWER_IN_USE == ORACLE_ANSWER_REPUTATION or ORACLE_ANSWER_MAJORITY_VOTING):
+        if ORACLE_ANSWER_IN_USE in (ORACLE_ANSWER_REPUTATION, ORACLE_ANSWER_MAJORITY_VOTING):
             # L, M, H
-            for EXPERTISE_IN_USE in EXPERTISES:
-                # 5, 15, 30
-                for ORACLE_SIZE_IN_USE in ORACLE_SIZES:
+            for ORACLE_SIZE_IN_USE in ORACLE_SIZES:
+                # 5, 15, 30 
+                for EXPERTISE_IN_USE in EXPERTISES:
                     init_perm_statistic(train_loader=train_loader, val_loader=val_loader, test_loader=test_loader)
         else:
             init_perm_statistic(train_loader=train_loader, val_loader=val_loader, test_loader=test_loader)
-
+ 
             
-    #ORACLE_ANSWER_IN_USE = ORACLE_ANSWER_REPUTATION
+    #ORACLE_ANSWER_IN_USE = ORACLE_ANSWER_GROUND_TRUTH
     #init_perm_statistic(train_loader=train_loader, val_loader=val_loader, test_loader=test_loader)
 
 def init_perm_query_strategy(train_loader, val_loader, test_loader):
@@ -205,61 +210,65 @@ def init_perm_query_strategy(train_loader, val_loader, test_loader):
     init_perm_oracle_answer(train_loader=train_loader, val_loader=val_loader, test_loader=test_loader)
 
 
-def main():
+def main(dataset):
 
     global DATASET_IN_USE
-    for DATASET_IN_USE in DATASETS:
-        path_dir = os.path.join(RESULTS_PATH, DATASET_IN_USE)
+    DATASET_IN_USE = dataset
 
-        transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.5,), (0.5,))])
+    path_dir = os.path.join(RESULTS_PATH, DATASET_IN_USE)
+
+    transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.5,), (0.5,))])
+
+    if(DATASET_IN_USE == DATASET_MNIST):
+        train_data = datasets.MNIST(root='./data', train=True, download=True, transform=transform)
+        test_data = datasets.MNIST(root='./data', train=True, download=True, transform=transform)
+    elif(DATASET_IN_USE == DATASET_MNIST_FASHION):
+        train_data = datasets.FashionMNIST(root='./data', train=True, download=True, transform=transform)
+        test_data = datasets.FashionMNIST(root='./data', train=False, download=True, transform=transform)
+    elif(DATASET_IN_USE == DATASET_CIFAR_10):
+        train_data = datasets.CIFAR10(root='./data', train=True, download=True, transform=transform)
+        test_data = datasets.CIFAR10(root='./data', train=False, download=True, transform=transform)
+    else:
+         raise ValueError(f"Invalid Dataset : {DATASET_IN_USE}")
+        
+
+    full_dataset = ConcatDataset([train_data, test_data])
+    train_data = filter_classes(train_data, classes=CLASSES)
+    test_data = filter_classes(test_data, classes=CLASSES)
+
     
-        if(DATASET_IN_USE == DATASET_MNIST):
-            train_data = datasets.MNIST(root='./data', train=True, download=True, transform=transform)
-            test_data = datasets.MNIST(root='./data', train=True, download=True, transform=transform)
-        elif(DATASET_IN_USE == DATASET_MNIST_FASHION):
-            train_data = datasets.FashionMNIST(root='./data', train=True, download=True, transform=transform)
-            test_data = datasets.FashionMNIST(root='./data', train=False, download=True, transform=transform)
-        elif(DATASET_IN_USE == DATASET_CIFAR_10):
-            train_data = datasets.CIFAR10(root='./data', train=True, download=True, transform=transform)
-            test_data = datasets.CIFAR10(root='./data', train=False, download=True, transform=transform)
+    #plot_sample_images(full_dataset, classes=CLASSES, num_samples=len(CLASSES))
+    
+    #noisy_dataset = add_noise_to_data(full_dataset, noise_factor=DATA_AUG_NOISE_FACTOR)
+    #plot_sample_images(noisy_dataset, classes=CLASSES, num_samples=6)
+    
+    #rotated_noisy_dataset = add_bidirectional_rotation(noisy_dataset, angle=25)
+    #plot_sample_images(rotated_noisy_dataset, classes=CLASSES, num_samples=6)
 
-        full_dataset = ConcatDataset([train_data, test_data])
-        train_data = filter_classes(train_data, classes=CLASSES)
-        test_data = filter_classes(test_data, classes=CLASSES)
+    #full_dataset = ConcatDataset([full_dataset, noisy_dataset, rotated_noisy_dataset])  # Junta o dataset original com os dados "noisy"
 
-        
-        #plot_sample_images(full_dataset, classes=CLASSES, num_samples=len(CLASSES))
-        
-        #noisy_dataset = add_noise_to_data(full_dataset, noise_factor=DATA_AUG_NOISE_FACTOR)
-        #plot_sample_images(noisy_dataset, classes=CLASSES, num_samples=6)
-        
-        #rotated_noisy_dataset = add_bidirectional_rotation(noisy_dataset, angle=25)
-        #plot_sample_images(rotated_noisy_dataset, classes=CLASSES, num_samples=6)
+    total_size = len(full_dataset)
+    train_size = int(TRAIN_SIZE_PERCENTAGE * total_size)
+    test_size = int(TEST_SIZE_PERCENTAGE * total_size)
+    val_size = total_size - train_size - test_size
 
-        #full_dataset = ConcatDataset([full_dataset, noisy_dataset, rotated_noisy_dataset])  # Junta o dataset original com os dados "noisy"
+    train_set, test_set, val_set = random_split(full_dataset, [train_size, test_size, val_size])
 
-        total_size = len(full_dataset)
-        train_size = int(TRAIN_SIZE_PERCENTAGE * total_size)
-        test_size = int(TEST_SIZE_PERCENTAGE * total_size)
-        val_size = total_size - train_size - test_size
+    train_dist = get_label_distribution(train_set)
+    val_dist = get_label_distribution(val_set)
+    test_dist = get_label_distribution(test_set)
+    
+    print(f"Train, Val, Tes distribution: {get_label_distribution(train_set)}, {val_dist}, {test_dist}")
+    plot_distribution(train_dist, "Train", save_path=path_dir, colors=CLASS_COLORS)
+    plot_distribution(val_dist, "Validation", save_path=path_dir, colors=CLASS_COLORS)
+    plot_distribution(test_dist, "Test", save_path=path_dir, colors=CLASS_COLORS)
 
-        train_set, test_set, val_set = random_split(full_dataset, [train_size, test_size, val_size])
+    train_loader = DataLoader(train_set, batch_size=64, shuffle=True)
+    val_loader = DataLoader(val_set, batch_size=64, shuffle=True)
+    test_loader = DataLoader(test_set, batch_size=64, shuffle=True)
 
-        train_dist = get_label_distribution(train_set)
-        val_dist = get_label_distribution(val_set)
-        test_dist = get_label_distribution(test_set)
-        
-        print(f"Train, Val, Tes distribution: {get_label_distribution(train_set)}, {val_dist}, {test_dist}")
-        plot_distribution(train_dist, "Train", save_path=path_dir, colors=CLASS_COLORS)
-        plot_distribution(val_dist, "Validation", save_path=path_dir, colors=CLASS_COLORS)
-        plot_distribution(test_dist, "Test", save_path=path_dir, colors=CLASS_COLORS)
-
-        train_loader = DataLoader(train_set, batch_size=64, shuffle=True)
-        val_loader = DataLoader(val_set, batch_size=64, shuffle=True)
-        test_loader = DataLoader(test_set, batch_size=64, shuffle=True)
-
-
-        init_perm_query_strategy(train_loader=train_loader, val_loader=val_loader, test_loader=test_loader)
+    #init
+    init_perm_query_strategy(train_loader=train_loader, val_loader=val_loader, test_loader=test_loader)
 
     
 def test_oracle():
@@ -278,6 +287,13 @@ def test_oracle():
 
 if __name__ == "__main__":
     #test_oracle()
-    main() 
+    parser = argparse.ArgumentParser(description="Script que aceita um dataset como argumento.")
+    parser.add_argument("--dataset", type=str, required=True, help="Nome do dataset a ser usado")
+    args = parser.parse_args()
+    
+    #test_oracle()
+    main(args.dataset)
+    
+
 
     
