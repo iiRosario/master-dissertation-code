@@ -80,7 +80,7 @@ class Annotator:
             cm_prob[true_class] = probs
         return cm_prob
     
-    def init_cm_prob_specialist(self, expert_accuracy=0.9, min_other_accuracy=0.2, max_other_accuracy=0.6, scale=20.0):
+    def init_cm_prob_specialist(self, expert_accuracy=0.8, min_other_accuracy=0.1, max_other_accuracy=0.5, scale=10.0):
         """
         Inicializa uma matriz de confusão probabilística em que o anotador tem alta precisão
         em apenas uma classe (escolhida aleatoriamente), e acurácia entre 20%-60% nas outras.

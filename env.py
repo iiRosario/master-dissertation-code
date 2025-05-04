@@ -26,6 +26,7 @@ POOL_SIZE = 16
 CLASSES = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
 
 ## Active Learning Configuration
+
 ORACLE_SIZE_LARGE = 30
 ORACLE_SIZE_MEDIUM = 15
 ORACLE_SIZE_SMALL = 5
