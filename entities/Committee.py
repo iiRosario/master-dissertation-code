@@ -31,7 +31,7 @@ class Committee:
         self.labeling_iteration += 1
         committee_answer = random.choice(CLASSES)
         self.update_metrics(answer=committee_answer, true_target=true_target)
-        self.write_annotators()
+        #self.write_annotators()
         return committee_answer
     
     def majority_voting_answer(self, true_target):
@@ -61,8 +61,9 @@ class Committee:
         for who_rates in self.annotators:
             for other in self.annotators:
                 if who_rates is not other:
-                    who_rates.rate(other)
-                    #print(f"who_rates: {who_rates.current_answer}   other: {other.current_answer}")
+                    who_rates.rate(other=other, true_label=true_target)
+                    #print(f"who_rates_id: {who_rates.id}   other_id: {other.id}")
+                    #print(f"who_rates_current_answer: {who_rates.current_answer}   other_current_answer: {other.current_answer}")
             
         sum_reputations = [0.00 for _ in range(len(CLASSES))]
         
@@ -149,12 +150,16 @@ class Committee:
             full_path = os.path.join(output_dir, filename)
             file_exists = os.path.isfile(full_path)
 
-            fieldnames = ["iteration", "cm", "reputations", "rating_scores"]
+            fieldnames = [
+                "iteration", "cm", "cm_ratings", "reputations", "rating_scores", "accuracies"
+            ]
 
             # Formatando as listas
-            cm_str = str(annotator.cm.tolist())
+            cm_str = str(annotator.cm)
+            cm_ratings_str = str(annotator.cm_ratings)  # Novo campo
             reputations_str = str([round(float(r), 2) for r in annotator.reputations])
             rating_scores_str = str(annotator.rating_scores)
+            accuracies_str = str([round(float(a), 4) for a in annotator.accuracies])
 
             with open(full_path, mode='a', newline='') as csv_file:
                 writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
@@ -165,8 +170,10 @@ class Committee:
                 writer.writerow({
                     "iteration": self.labeling_iteration,
                     "cm": cm_str,
+                    "cm_ratings": cm_ratings_str,  # Adicionado ao CSV
                     "reputations": reputations_str,
-                    "rating_scores": rating_scores_str
+                    "rating_scores": rating_scores_str,
+                    "accuracies": accuracies_str
                 })
 
     def __repr__(self):

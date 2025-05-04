@@ -276,10 +276,49 @@ def add_bidirectional_rotation(dataset, angle=25):
 
 
 
+def save_class_distributions_to_csv(train_dist, val_dist, test_dist, path):
+    # Garante que o diretório existe
+    filename='class_distribution.csv'
+    path = os.path.join(path, filename) 
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    
+      # Remove o ficheiro se já existir
+    if os.path.exists(path):
+        os.remove(path)
 
-## ACTIVE LEARNING
+    classes = sorted(set(train_dist.keys()) | set(val_dist.keys()) | set(test_dist.keys()))
 
-def random_sampling(classifier, X_pool):
-    n_samples = len(X_pool)
-    query_idx = np.random.choice(range(n_samples))
-    return query_idx, X_pool[query_idx]
+    with open(path, mode='w', newline='') as file:
+        writer = csv.writer(file)
+        writer.writerow(['Class', 'Train', 'Validation', 'Test'])  # Cabeçalho
+
+        for cls in classes:
+            train_count = train_dist.get(cls, 0)
+            val_count = val_dist.get(cls, 0)
+            test_count = test_dist.get(cls, 0)
+            writer.writerow([cls, train_count, val_count, test_count])
+
+
+
+def save_class_distributions_to_csv_2(init_train_dist, rest_train_dist, path):
+    # Garante que o diretório existe
+    filename='train_class_distribution.csv'
+    path = os.path.join(path, filename) 
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    
+      # Remove o ficheiro se já existir
+    if os.path.exists(path):
+        os.remove(path)
+
+    classes = sorted(set(init_train_dist.keys()) | set(rest_train_dist.keys()))
+
+    with open(path, mode='w', newline='') as file:
+        writer = csv.writer(file)
+        writer.writerow(['Class', 'init_train_dist', 'rest_train_dist'])  # Cabeçalho
+
+        for cls in classes:
+            train_count = init_train_dist.get(cls, 0)
+            val_count = rest_train_dist.get(cls, 0)
+            writer.writerow([cls, train_count, val_count])
+
+

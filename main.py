@@ -5,6 +5,7 @@ import torch.optim as optim
 import torch.nn as nn
 from modAL.models import ActiveLearner
 from sklearn.model_selection import train_test_split
+from sklearn.model_selection import StratifiedShuffleSplit
 from torch.utils.data import Subset, DataLoader, random_split, ConcatDataset
 from torchvision import datasets, transforms
 from entities.Annotator import Annotator
@@ -101,6 +102,7 @@ def init_active_learning_pool(train_loader, val_loader, test_loader, seed):
     # Visualiza distribuição inicial
     plot_distribution_2(Counter(y_init.tolist()), "init_train", CLASS_COLORS, plots_path)
     plot_distribution_2(Counter(y_unlabeled.tolist()), "unlabeled_train", CLASS_COLORS, plots_path)
+    save_class_distributions_to_csv_2(Counter(y_init.tolist()), Counter(y_unlabeled.tolist()), path=plots_path)
 
     # --- inicializa modelo e learner ---
     model = LeNet5(device=device, dataset=DATASET_IN_USE).to(device)
@@ -130,7 +132,6 @@ def init_active_learning_pool(train_loader, val_loader, test_loader, seed):
         oracle_labels = select_answer_type(oracle, true_labels)
 
         learner.teach(X=x_query, y=oracle_labels)
-        
         print(f"learner DL size: {len(learner.y_training)}")
         
         # Remove do pool as instâncias já rotuladas
@@ -143,22 +144,21 @@ def init_active_learning_pool(train_loader, val_loader, test_loader, seed):
         else:
             metrics = learner.estimator.evaluate(x_val, y_val)
 
-        print(f"   AVG Acc: {avg_metric(metrics, 'accuracy_per_class'):.4f}\n"+
+        avg_acc = avg_metric(metrics, 'accuracy_per_class')
+        print(f"   AVG Acc: {avg_acc:.4f}\n" +
               f"   AVG Precision: {avg_metric(metrics, 'precision_per_class'):.4f}")
-        
-        list_oracle_labels = []
-        list_true_labels = []
-        for i in range(len(query_idx)):
-            list_oracle_labels.append(oracle_labels[i].item())
-            list_true_labels.append(true_labels[i].item())
 
-        write_metrics_to_csv(results_path, results_file,  cycle=cycle+1,
-                             oracle_label=list_oracle_labels,  # se usar oracle diferente, modifique aqui
-                             ground_truth_label=list_true_labels,
-                             metrics=metrics,
-                             oracle_cm=oracle.cm,
-                             oracle_iterations=oracle.labeling_iteration)
+        # Salva métricas
+        list_oracle_labels = [oracle_labels[i].item() for i in range(len(query_idx))]
+        list_true_labels = [true_labels[i].item() for i in range(len(query_idx))]
 
+        write_metrics_to_csv(results_path, results_file, cycle=cycle + 1,
+                            oracle_label=list_oracle_labels,
+                            ground_truth_label=list_true_labels,
+                            metrics=metrics,
+                            oracle_cm=oracle.cm,
+                            oracle_iterations=oracle.labeling_iteration)
+    
     # --- pós-processamento ---
     plot_all_metrics_over_cycles(csv_path, plots_path, seed)
     print("Done for seed:", seed)
@@ -219,46 +219,52 @@ def main(dataset):
 
     transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.5,), (0.5,))])
 
-    if(DATASET_IN_USE == DATASET_MNIST):
+    if DATASET_IN_USE == DATASET_MNIST:
         train_data = datasets.MNIST(root='./data', train=True, download=True, transform=transform)
-        test_data = datasets.MNIST(root='./data', train=True, download=True, transform=transform)
-    elif(DATASET_IN_USE == DATASET_MNIST_FASHION):
+        test_data = datasets.MNIST(root='./data', train=False, download=True, transform=transform)
+
+    elif DATASET_IN_USE == DATASET_MNIST_FASHION:
         train_data = datasets.FashionMNIST(root='./data', train=True, download=True, transform=transform)
         test_data = datasets.FashionMNIST(root='./data', train=False, download=True, transform=transform)
-    elif(DATASET_IN_USE == DATASET_CIFAR_10):
+
+    elif DATASET_IN_USE == DATASET_CIFAR_10:
         train_data = datasets.CIFAR10(root='./data', train=True, download=True, transform=transform)
         test_data = datasets.CIFAR10(root='./data', train=False, download=True, transform=transform)
+
+    elif DATASET_IN_USE == DATASET_EMNIST_DIGITS:
+        train_data = datasets.EMNIST(root='./data', split='digits', train=True, download=True, transform=transform)
+        test_data = datasets.EMNIST(root='./data', split='digits', train=False, download=True, transform=transform)
+
     else:
-         raise ValueError(f"Invalid Dataset : {DATASET_IN_USE}")
+        raise ValueError(f"Invalid Dataset : {DATASET_IN_USE}")
         
 
-    full_dataset = ConcatDataset([train_data, test_data])
     train_data = filter_classes(train_data, classes=CLASSES)
     test_data = filter_classes(test_data, classes=CLASSES)
 
-    
-    #plot_sample_images(full_dataset, classes=CLASSES, num_samples=len(CLASSES))
-    
-    #noisy_dataset = add_noise_to_data(full_dataset, noise_factor=DATA_AUG_NOISE_FACTOR)
-    #plot_sample_images(noisy_dataset, classes=CLASSES, num_samples=6)
-    
-    #rotated_noisy_dataset = add_bidirectional_rotation(noisy_dataset, angle=25)
-    #plot_sample_images(rotated_noisy_dataset, classes=CLASSES, num_samples=6)
-
-    #full_dataset = ConcatDataset([full_dataset, noisy_dataset, rotated_noisy_dataset])  # Junta o dataset original com os dados "noisy"
+    full_dataset = ConcatDataset([train_data, test_data])
 
     total_size = len(full_dataset)
     train_size = int(TRAIN_SIZE_PERCENTAGE * total_size)
     test_size = int(TEST_SIZE_PERCENTAGE * total_size)
     val_size = total_size - train_size - test_size
 
-    train_set, test_set, val_set = random_split(full_dataset, [train_size, test_size, val_size])
+    # Índices sequenciais
+    all_indices = list(range(total_size))
+    train_indices = all_indices[:train_size]
+    test_indices = all_indices[train_size:train_size + test_size]
+    val_indices = all_indices[train_size + test_size:]
+
+    # Subsets finais
+    train_set = Subset(full_dataset, train_indices)
+    val_set = Subset(full_dataset, val_indices)
+    test_set = Subset(full_dataset, test_indices)
 
     train_dist = get_label_distribution(train_set)
     val_dist = get_label_distribution(val_set)
     test_dist = get_label_distribution(test_set)
     
-    print(f"Train, Val, Tes distribution: {get_label_distribution(train_set)}, {val_dist}, {test_dist}")
+    save_class_distributions_to_csv(train_dist, val_dist, test_dist, path_dir)
     plot_distribution(train_dist, "Train", save_path=path_dir, colors=CLASS_COLORS)
     plot_distribution(val_dist, "Validation", save_path=path_dir, colors=CLASS_COLORS)
     plot_distribution(test_dist, "Test", save_path=path_dir, colors=CLASS_COLORS)
@@ -271,16 +277,31 @@ def main(dataset):
     init_perm_query_strategy(train_loader=train_loader, val_loader=val_loader, test_loader=test_loader)
 
     
-def test_oracle():
-    committee = Committee(size=30, seed=30, expertise=LOW_EXPERTISE)
+def test_oracle(dataset):
+    global DATASET_IN_USE
+    global QUERY_STRATEGY_IN_USE
+    global ORACLE_ANSWER_IN_USE
+    global EXPERTISE_IN_USE
+    global ORACLE_SIZE_IN_USE
     
-    for i in range(30):
-        #print("=======================================================")
+    DATASET_IN_USE = dataset
+    QUERY_STRATEGY_IN_USE = UNCERTAINTY_SAMPLING
+    ORACLE_ANSWER_IN_USE = ORACLE_ANSWER_REPUTATION
+    EXPERTISE_IN_USE = EXPERT_EXPERTISE
+    ORACLE_SIZE_IN_USE = ORACLE_SIZE_LARGE
+
+
+    results_path = create_results_dir(seed=1)
+    committee = Committee(size=ORACLE_SIZE_IN_USE, seed=30, expertise=EXPERTISE_IN_USE, results_path = results_path)
+    
+    for i in range(1):
+        print("=======================================================")
         true_label = i % len(CLASSES)
-        ans = committee.random_answer(true_target=true_label)
+        ans = committee.weight_reputation_answer(true_target=true_label)
         
-    print(committee.repr_cm())
-    committee.compute_and_print_metrics()
+
+    #print(committee.repr_cm())
+    #committee.compute_and_print_metrics()
 
     """ for ann in committee.annotators:
         print(ann.repr_cm_prob()) """
@@ -291,7 +312,7 @@ if __name__ == "__main__":
     parser.add_argument("--dataset", type=str, required=True, help="Nome do dataset a ser usado")
     args = parser.parse_args()
     
-    #test_oracle()
+    #test_oracle(args.dataset)
     main(args.dataset)
     
 

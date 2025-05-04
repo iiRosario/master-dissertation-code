@@ -22,15 +22,18 @@ class Annotator:
         
         # If alphas not provided, set a default: higher value for correct label
         if(self.expertise == LOW_EXPERTISE):
-            self.cm_prob = self.init_cm_prob(target_accuracy=0.5, scale=20.0)
+            self.cm_prob = self.init_cm_prob(target_accuracy=0.4, scale=20.0)
         elif(self.expertise == MEDIUM_EXPERTISE):
-            self.cm_prob = self.init_cm_prob(target_accuracy=0.6, scale=20.0)
+            self.cm_prob = self.init_cm_prob(target_accuracy=0.5, scale=20.0)
         elif(self.expertise == HIGH_EXPERTISE):
-            self.cm_prob = self.init_cm_prob(target_accuracy=0.7, scale=20.0)
+            self.cm_prob = self.init_cm_prob(target_accuracy=0.6, scale=20.0)
         elif(self.expertise == VERY_HIGH_EXPERTISE):
             self.cm_prob = self.init_cm_prob(target_accuracy=0.8, scale=20.0)
-        
+        elif(self.expertise == EXPERT_EXPERTISE):
+            self.cm_prob = self.init_cm_prob_specialist()
+
         self.cm = np.zeros((self.num_classes, self.num_classes))
+        self.cm_ratings = np.zeros((self.num_classes, self.num_classes))
 
         self.reputations = [0.0000 for _ in range(num_classes)]
         self.rating_scores = [0 for _ in range(num_classes)]
@@ -47,6 +50,9 @@ class Annotator:
         self.avg_f1_score = 0.0000
 
         self.current_answer = -1
+
+        
+        
 
 
 
@@ -74,6 +80,43 @@ class Annotator:
             cm_prob[true_class] = probs
         return cm_prob
     
+    def init_cm_prob_specialist(self, expert_accuracy=0.9, min_other_accuracy=0.2, max_other_accuracy=0.6, scale=20.0):
+        """
+        Inicializa uma matriz de confusão probabilística em que o anotador tem alta precisão
+        em apenas uma classe (escolhida aleatoriamente), e acurácia entre 20%-60% nas outras.
+
+        :param expert_accuracy: Probabilidade média desejada de acerto para a classe especialista.
+        :param min_other_accuracy: Acerto mínimo nas outras classes.
+        :param max_other_accuracy: Acerto máximo nas outras classes.
+        :param scale: Parâmetro de concentração da Dirichlet.
+        """
+        cm_prob = np.zeros((self.num_classes, self.num_classes))
+
+        # Escolher aleatoriamente a classe especialista
+        expert_class = np.random.randint(0, self.num_classes)
+
+        for true_class in range(self.num_classes):
+            if true_class == expert_class:
+                target_accuracy = expert_accuracy
+            else:
+                target_accuracy = np.random.uniform(min_other_accuracy, max_other_accuracy)
+
+            alpha_vector = [(1 - target_accuracy) / (self.num_classes - 1) * scale
+                            for _ in range(self.num_classes)]
+            alpha_vector[true_class] = target_accuracy * scale
+
+            probs = np.random.dirichlet(alpha_vector)
+            probs = np.round(probs, 2)
+
+            # Corrigir soma para 1.0
+            diff = 1.0 - probs.sum()
+            probs[np.argmax(probs)] += diff
+
+            cm_prob[true_class] = probs
+
+        #print(f"Classe especialista do anotador: {expert_class}")
+        return cm_prob
+
 
     def answer(self, true_label):
         probabilities = self.cm_prob[true_label]
@@ -82,13 +125,16 @@ class Annotator:
         self.current_answer = ans         # Save the answer
         return ans
         
-    def rate(self, other):
+    def rate(self, other, true_label=None):
         result = 0
         if self.current_answer != other.current_answer:
             result = NEGATIVE_RATING
         else:
             result = POSITIVE_RATING
         other.rating_scores[other.current_answer] += result
+
+        self.cm_ratings[true_label, self.current_answer] += 1
+
         return result
 
     def rating_score_value(self, score_i, n_annotators, labeling_iteration):
@@ -100,7 +146,10 @@ class Annotator:
 
         for i in range(len(self.reputations)):
             # R = Ratingscore * alpha + Accuracy * beta 
-            self.reputations[i] = self.rating_score_value(i, N, iteration) * self.alpha + self.accuracies[i] * self.beta
+            rating = self.rating_score_value(i, N, iteration)
+            accuracy = self.accuracies[i]
+            #print(f"ID: {self.id} Class: {i} Rating: {rating}, Accuracy: {accuracy}")
+            self.reputations[i] = rating * self.alpha + accuracy * self.beta
         
         return self.reputations
 
