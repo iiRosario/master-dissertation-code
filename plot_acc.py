@@ -559,7 +559,7 @@ def plot_accuracy_comparison_strategies(dataset: str,
         "5 Annotators": os.path.join(BASE_DIR, "runs", dataset, query_strategy, "reputation_based", "5", "E"),
         "15 Annotators": os.path.join(BASE_DIR, "runs", dataset, query_strategy, "reputation_based", "15", "E"),
         "30 Annotators": os.path.join(BASE_DIR, "runs", dataset, query_strategy, "reputation_based", "30", "E"),
-        "Random": os.path.join(BASE_DIR, "runs", dataset, query_strategy, "random")
+        "Baseline": os.path.join(BASE_DIR, "runs", dataset, query_strategy, "random")
     }
 
     color_map = {
@@ -567,7 +567,7 @@ def plot_accuracy_comparison_strategies(dataset: str,
         "5 Annotators": "red",
         "15 Annotators": "green",
         "30 Annotators": "orange",
-        "Random": "purple"
+        "Baseline": "purple"
     }
 
     all_results = {}
@@ -635,9 +635,201 @@ def plot_accuracy_comparison_strategies(dataset: str,
         plt.close()
     else:
         plt.show()
+
+def plot_precision_comparison_strategies(dataset: str,
+                                         query_strategy: str = "uncertainty_sampling",
+                                         confusion_column: str = "confusion_matrix",
+                                         results_prefix: str = "results_",
+                                         save_path: str = None):
+
+    strategies = {
+        "Ground Truth": os.path.join(BASE_DIR, "runs", dataset, query_strategy, "ground_truth"),
+        "5 Annotators": os.path.join(BASE_DIR, "runs", dataset, query_strategy, "reputation_based", "5", "E"),
+        "15 Annotators": os.path.join(BASE_DIR, "runs", dataset, query_strategy, "reputation_based", "15", "E"),
+        "30 Annotators": os.path.join(BASE_DIR, "runs", dataset, query_strategy, "reputation_based", "30", "E"),
+        "Baseline": os.path.join(BASE_DIR, "runs", dataset, query_strategy, "random")
+    }
+
+    color_map = {
+        "Ground Truth": "blue",
+        "5 Annotators": "red",
+        "15 Annotators": "green",
+        "30 Annotators": "orange",
+        "Baseline": "purple"
+    }
+
+    all_results = {}
+
+    for label, path in strategies.items():
+        all_precisions = {}
+
+        if not os.path.isdir(path):
+            print(f"[IGNORADO] Pasta não encontrada: {path}")
+            continue
+
+        for folder in os.listdir(path):
+            folder_path = os.path.join(path, folder)
+            if os.path.isdir(folder_path) and folder.startswith(results_prefix):
+                for file in os.listdir(folder_path):
+                    if file.endswith(".csv"):
+                        file_path = os.path.join(folder_path, file)
+
+                        try:
+                            df = pd.read_csv(file_path, sep=None, engine='python')
+                            df.columns = [col.strip().replace('\ufeff', '') for col in df.columns]
+
+                            for _, row in df.iterrows():
+                                cycle = int(row['cycle'])
+                                confusion_str = row[confusion_column]
+                                confusion = np.array(ast.literal_eval(confusion_str))
+
+                                with np.errstate(divide='ignore', invalid='ignore'):
+                                    tp = np.diag(confusion)
+                                    fp = np.sum(confusion, axis=0) - tp
+                                    precision_per_class = tp / (tp + fp)
+                                    precision_per_class = np.nan_to_num(precision_per_class)
+                                    precision = np.mean(precision_per_class)
+
+                                if cycle not in all_precisions:
+                                    all_precisions[cycle] = []
+                                all_precisions[cycle].append(precision)
+
+                        except Exception as e:
+                            print(f"Erro no arquivo {file_path}, linha {row.name}: {e}")
+
+        if all_precisions:
+            cycles = sorted(all_precisions.keys())
+            mean_precisions = [np.mean(all_precisions[c]) for c in cycles]
+            std_precisions = [np.std(all_precisions[c]) for c in cycles]
+            all_results[label] = (cycles, mean_precisions, std_precisions)
+
+    # Plot
+    plt.figure(figsize=(12, 6))
+    for label, (cycles, means, stds) in all_results.items():
+        means_array = np.array(means)
+        stds_array = np.array(stds)
+        upper = np.clip(means_array + stds_array, 0, 1)
+        lower = np.clip(means_array - stds_array, 0, 1)
+
+        plt.plot(cycles, means, label=label, linewidth=2, color=color_map[label])
+        plt.fill_between(cycles, lower, upper, alpha=0.2, color=color_map[label])
+
+    plt.xlabel('Cycle')
+    plt.ylabel('Precision (Avg. ± std)')
+    plt.title(f'Precision Comparison - {dataset}')
+    plt.grid(True)
+    plt.legend()
+    plt.tight_layout()
+
+    if save_path:
+        plt.savefig(save_path)
+        print(f"Gráfico salvo em {save_path}")
+        plt.close()
+    else:
+        plt.show()
+
+def plot_f1_score_comparison_strategies(dataset: str,
+                                        query_strategy: str = "uncertainty_sampling",
+                                        confusion_column: str = "confusion_matrix",
+                                        results_prefix: str = "results_",
+                                        save_path: str = None):
+
+    strategies = {
+        "Ground Truth": os.path.join(BASE_DIR, "runs", dataset, query_strategy, "ground_truth"),
+        "5 Annotators": os.path.join(BASE_DIR, "runs", dataset, query_strategy, "reputation_based", "5", "E"),
+        "15 Annotators": os.path.join(BASE_DIR, "runs", dataset, query_strategy, "reputation_based", "15", "E"),
+        "30 Annotators": os.path.join(BASE_DIR, "runs", dataset, query_strategy, "reputation_based", "30", "E"),
+        "Baseline": os.path.join(BASE_DIR, "runs", dataset, query_strategy, "random")
+    }
+
+    color_map = {
+        "Ground Truth": "blue",
+        "5 Annotators": "red",
+        "15 Annotators": "green",
+        "30 Annotators": "orange",
+        "Baseline": "purple"
+    }
+
+    all_results = {}
+
+    for label, path in strategies.items():
+        all_f1_scores = {}
+
+        if not os.path.isdir(path):
+            print(f"[IGNORADO] Pasta não encontrada: {path}")
+            continue
+
+        for folder in os.listdir(path):
+            folder_path = os.path.join(path, folder)
+            if os.path.isdir(folder_path) and folder.startswith(results_prefix):
+                for file in os.listdir(folder_path):
+                    if file.endswith(".csv"):
+                        file_path = os.path.join(folder_path, file)
+
+                        try:
+                            df = pd.read_csv(file_path, sep=None, engine='python')
+                            df.columns = [col.strip().replace('\ufeff', '') for col in df.columns]
+
+                            for _, row in df.iterrows():
+                                cycle = int(row['cycle'])
+                                confusion_str = row[confusion_column]
+                                confusion = np.array(ast.literal_eval(confusion_str))
+
+                                with np.errstate(divide='ignore', invalid='ignore'):
+                                    tp = np.diag(confusion)
+                                    fp = np.sum(confusion, axis=0) - tp
+                                    fn = np.sum(confusion, axis=1) - tp
+
+                                    precision = tp / (tp + fp)
+                                    recall = tp / (tp + fn)
+
+                                    precision = np.nan_to_num(precision)
+                                    recall = np.nan_to_num(recall)
+
+                                    f1 = 2 * precision * recall / (precision + recall)
+                                    f1 = np.nan_to_num(f1)
+
+                                    f1_macro = np.mean(f1)
+
+                                if cycle not in all_f1_scores:
+                                    all_f1_scores[cycle] = []
+                                all_f1_scores[cycle].append(f1_macro)
+
+                        except Exception as e:
+                            print(f"Erro no arquivo {file_path}, linha {row.name}: {e}")
+
+        if all_f1_scores:
+            cycles = sorted(all_f1_scores.keys())
+            mean_f1s = [np.mean(all_f1_scores[c]) for c in cycles]
+            std_f1s = [np.std(all_f1_scores[c]) for c in cycles]
+            all_results[label] = (cycles, mean_f1s, std_f1s)
+
+    # Plot
+    plt.figure(figsize=(12, 6))
+    for label, (cycles, means, stds) in all_results.items():
+        means_array = np.array(means)
+        stds_array = np.array(stds)
+        upper = np.clip(means_array + stds_array, 0, 1)
+        lower = np.clip(means_array - stds_array, 0, 1)
+
+        plt.plot(cycles, means, label=label, linewidth=2, color=color_map[label])
+        plt.fill_between(cycles, lower, upper, alpha=0.2, color=color_map[label])
+
+    plt.xlabel('Cycle')
+    plt.ylabel('F1-score (Avg. ± std)')
+    plt.title(f'F1-score Comparison - {dataset}')
+    plt.grid(True)
+    plt.legend()
+    plt.tight_layout()
+
+    if save_path:
+        plt.savefig(save_path)
+        print(f"Gráfico salvo em {save_path}")
+        plt.close()
+    else:
+        plt.show()
+
 # ==============================================================================
-
-
 
 def plot_all():
 
@@ -684,43 +876,29 @@ def plot_all():
                         plot_f1_score_with_std(path, save_path=f1_path)
                     else:
                         print(f"[IGNORADO] Pasta não encontrada: {path}")
-
-
-# =================================================================================
-
-#plot_accuracy_comparative_reputation_based_E(DATASET_MNIST_FASHION, "uncertainty_sampling", save_path=os.path.join(BASE_DIR, "runs", DATASET_MNIST_FASHION, "uncertainty_sampling", "reputation_based", "comparative_accuracy_plot.png"))
-
-#plot_precision_comparative_reputation_based_E(DATASET_MNIST_FASHION, "uncertainty_sampling", save_path=os.path.join(BASE_DIR, "runs", DATASET_MNIST_FASHION, "uncertainty_sampling", "reputation_based", "comparative_precision_plot.png"))
-
-#plot_f1_comparative_reputation_based_E(DATASET_MNIST_FASHION, "uncertainty_sampling", save_path=os.path.join(BASE_DIR, "runs", DATASET_MNIST_FASHION, "uncertainty_sampling", "reputation_based", "comparative_f1_plot.png"))
-
-#plot_recall_comparative_reputation_based_E(DATASET_MNIST_FASHION, "uncertainty_sampling", save_path=os.path.join(BASE_DIR, "runs", DATASET_MNIST_FASHION, "uncertainty_sampling", "reputation_based", "comparative_recall_plot.png"))
-
-# ===================
-
-plot_accuracy_comparison_strategies(DATASET_MNIST_FASHION, "uncertainty_sampling", save_path=os.path.join(BASE_DIR, "runs", DATASET_MNIST_FASHION, "uncertainty_sampling", "comparative_accuracy_plot.png"))
-
-
-
-# =================================================================================
-
-#plot_accuracy_comparative_reputation_based_E(DATASET_MNIST, "uncertainty_sampling", save_path=os.path.join(BASE_DIR, "runs", DATASET_MNIST, "uncertainty_sampling", "reputation_based", "comparative_accuracy_plot.png"))
-
-#plot_precision_comparative_reputation_based_E(DATASET_MNIST, "uncertainty_sampling", save_path=os.path.join(BASE_DIR, "runs", DATASET_MNIST, "uncertainty_sampling", "reputation_based", "comparative_precision_plot.png"))
-
-#plot_f1_comparative_reputation_based_E(DATASET_MNIST, "uncertainty_sampling", save_path=os.path.join(BASE_DIR, "runs", DATASET_MNIST, "uncertainty_sampling", "reputation_based", "comparative_f1_plot.png"))
-
-#plot_recall_comparative_reputation_based_E(DATASET_MNIST, "uncertainty_sampling", save_path=os.path.join(BASE_DIR, "runs", DATASET_MNIST, "uncertainty_sampling", "reputation_based", "comparative_recall_plot.png"))
-
+    
 
 # =================================================================================
 
 
-#base_path = os.path.join(BASE_DIR, "runs", DATASET_MNIST_FASHION, "uncertainty_sampling", "reputation_based")
+def plot_all_results(dataset):
+    plot_accuracy_comparative_reputation_based_E(dataset, "uncertainty_sampling", save_path=os.path.join(BASE_DIR, "runs", dataset, "uncertainty_sampling", "reputation_based", "comparative_accuracy_plot.png"))
 
-#sub_folders = ["5", "15", "30"]
-#sub_sub_folders = ["E", "VH", "H", "M", "L"]
+    plot_precision_comparative_reputation_based_E(dataset, "uncertainty_sampling", save_path=os.path.join(BASE_DIR, "runs", dataset, "uncertainty_sampling", "reputation_based", "comparative_precision_plot.png"))
 
-#plot_accuracy_with_std(base_path, save_path=os.path.join(base_path, "accuracy_plot.png"))
-#plot_precision_with_std(base_path, save_path=os.path.join(base_path, "precision_plot.png"))
-#plot_f1_score_with_std(base_path, save_path=os.path.join(base_path, "f1_score_plot.png"))
+    plot_f1_comparative_reputation_based_E(dataset, "uncertainty_sampling", save_path=os.path.join(BASE_DIR, "runs", dataset, "uncertainty_sampling", "reputation_based", "comparative_f1_plot.png"))
+
+
+    plot_accuracy_comparison_strategies(dataset, "uncertainty_sampling", save_path=os.path.join(BASE_DIR, "runs", dataset, "uncertainty_sampling", "comparative_accuracy_plot.png"))
+
+    plot_precision_comparison_strategies(dataset, "uncertainty_sampling", save_path=os.path.join(BASE_DIR, "runs", dataset, "uncertainty_sampling", "comparative_precision_plot.png"))
+
+    plot_f1_score_comparison_strategies(dataset, "uncertainty_sampling", save_path=os.path.join(BASE_DIR, "runs", dataset, "uncertainty_sampling", "comparative_f1_plot.png"))
+
+
+
+
+plot_all_results(dataset=DATASET_MNIST_FASHION)
+plot_all_results(dataset=DATASET_MNIST)
+plot_all_results(dataset=DATASET_CIFAR_10)
+plot_all_results(dataset=DATASET_EMNIST_DIGITS)
