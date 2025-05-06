@@ -131,6 +131,7 @@ class Annotator:
             result = NEGATIVE_RATING
         else:
             result = POSITIVE_RATING
+            print("POSITIVE RATING")
         other.rating_scores[other.current_answer] += result
 
         self.cm_ratings[true_label, self.current_answer] += 1

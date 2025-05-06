@@ -1,0 +1,40 @@
+# Atualizar o systemd para ver o novo serviço
+sudo systemctl daemon-reload
+
+# Iniciar o serviço
+sudo systemctl start drosario_active_learning.service
+
+# (Opcional) Fazer o serviço iniciar automaticamente ao ligar o sistema
+sudo systemctl enable drosario_active_learning.service
+
+sudo systemctl status drosario_active_learning.service
+
+sudo systemctl stop drosario_active_learning.service
+
+journalctl -u drosario_active_learning.service -f
+
+
+
+sudo nano /etc/systemd/system/drosario_al_cifar_10.service
+sudo nano /etc/systemd/system/drosario_al_mnist.service
+sudo nano /etc/systemd/system/drosario_al_mnist_fashion.service
+sudo nano /etc/systemd/system/drosario_al_emnist_digits.service
+
+
+sudo systemctl start drosario_al_cifar_10
+sudo systemctl start drosario_al_mnist
+sudo systemctl start drosario_al_mnist_fashion
+sudo systemctl start drosario_al_emnist_digits
+
+sudo systemctl status drosario_al_cifar_10
+sudo systemctl status drosario_al_mnist
+sudo systemctl status drosario_al_mnist_fashion
+sudo systemctl status drosario_al_emnist_digits
+
+sudo journalctl -u drosario_al_cifar_10.service -f
+
+
+sudo systemctl stop drosario_al_cifar_10
+sudo systemctl stop drosario_al_mnist
+sudo systemctl stop drosario_al_mnist_fashion
+sudo systemctl stop drosario_al_emnist_digits
