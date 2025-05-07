@@ -29,7 +29,7 @@ class Annotator:
         elif self.expertise == RANDOM_EXPERTISE:
             self.cm_prob = self.init_cm_prob_random()
 
-        print(self.repr_cm_prob())
+        #print(self.repr_cm_prob())
 
         self.cm = np.zeros((self.num_classes, self.num_classes))
         self.cm_ratings = np.zeros((self.num_classes, self.num_classes))
