@@ -19,7 +19,7 @@ class LeNet5(nn.Module):
         self.lr = lr
         self.batch_size = batch_size
 
-        if (dataset == DATASET_CIFAR_10): 
+        if dataset in (DATASET_CIFAR_10 or DATASET_SVHN): 
             in_channels = 3
         else:
             in_channels = 1
@@ -31,7 +31,7 @@ class LeNet5(nn.Module):
         self.conv2 = nn.Conv2d(6, 16, kernel_size=5)
         
 
-        if dataset == DATASET_CIFAR_10:
+        if dataset in (DATASET_CIFAR_10 or DATASET_SVHN):
             # Após conv1 (6 filtros 5x5) + pool: 28x28 -> 14x14
             # Após conv2 (16 filtros 5x5) + pool: 10x10 -> 5x5
             fc_input_size = 16 * 5 * 5  # 16 filtros, cada um de tamanho 5x5 após pooling

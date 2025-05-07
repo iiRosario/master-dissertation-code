@@ -6,11 +6,12 @@ import pandas as pd
 
 
 class Committee:
-    def __init__(self, size=30, seed=-1, expertise=HIGH_EXPERTISE, results_path=None):
+    def __init__(self, size=30, seed=-1, expertise=HIGH_EXPERTISE, results_path=None, rating_flag=WITH_RATING):
         self.seed = seed    
         random.seed(seed)
         self.results_path = results_path
         self.labeling_iteration = 0
+        self.rating_flag = rating_flag
 
         self.labeled_samples_class = [0 for _ in range(len(CLASSES))]
         self.cm = np.zeros((len(CLASSES), len(CLASSES)))
@@ -19,7 +20,15 @@ class Committee:
 
         self.annotators = []
         for i in range(size):
-            ann = Annotator(id=i, seed=seed+i, num_classes=len(CLASSES), alpha=0.5, beta=0.5, expertise=expertise)
+            if self.rating_flag == WITH_RATING:         
+                alpha, beta = 0.5, 0.5
+            elif self.rating_flag == WITHOUT_RATING:    
+                alpha, beta = 0.0, 1.0
+            else:                                       
+                alpha, beta = 0.5, 0.5  
+
+            print(f"alpha: {alpha}, beta: {beta}")
+            ann = Annotator(id=i, seed=seed+i, num_classes=len(CLASSES), alpha=alpha, beta=beta, expertise=expertise)
             self.annotators.append(ann)
     
 
@@ -34,20 +43,6 @@ class Committee:
         #self.write_annotators()
         return committee_answer
     
-    def majority_voting_answer(self, true_target):
-        committee_answer = -1
-        self.labeling_iteration += 1
-        
-        votes = [0 for _ in range(len(CLASSES))]
-
-        for annotator in self.annotators:
-            answer = annotator.answer(true_target)
-            votes[answer] += 1
-        committee_answer = votes.index(max(votes)) 
-
-        self.update_metrics(answer=committee_answer, true_target=true_target)
-        self.write_annotators()
-        return committee_answer 
 
     def weight_reputation_answer(self, true_target):
         committee_answer = -1
@@ -58,12 +53,13 @@ class Committee:
             annotator.answer(true_target)
         
         # RATE OTHERS (skip self)
-        for who_rates in self.annotators:
-            for other in self.annotators:
-                if who_rates is not other:
-                    who_rates.rate(other=other, true_label=true_target)
-                    #print(f"who_rates_id: {who_rates.id}   other_id: {other.id}")
-                    #print(f"who_rates_current_answer: {who_rates.current_answer}   other_current_answer: {other.current_answer}")
+        if(self.rating_flag == WITH_RATING):
+            for who_rates in self.annotators:
+                for other in self.annotators:
+                    if who_rates is not other:
+                        who_rates.rate(other=other, true_label=true_target)
+                        #print(f"who_rates_id: {who_rates.id}   other_id: {other.id}")
+                        #print(f"who_rates_current_answer: {who_rates.current_answer}   other_current_answer: {other.current_answer}")
             
         sum_reputations = [0.00 for _ in range(len(CLASSES))]
         
@@ -78,6 +74,7 @@ class Committee:
         self.update_metrics(answer=committee_answer, true_target=true_target)
         self.write_annotators()
         return committee_answer
+
 
     def compute_and_print_metrics(self):
         """

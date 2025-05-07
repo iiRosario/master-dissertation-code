@@ -16,21 +16,20 @@ class Annotator:
         self.seed = seed
         np.random.seed(self.seed)
         self.num_classes = num_classes
-        self.alpha=0.5                  #Score Ratings weight
-        self.beta=0.5                   #Accuracy  Weight
+        self.alpha = alpha                    #Score Ratings weight
+        self.beta = beta                      #Accuracy  Weight
         self.expertise = expertise
         
-        # If alphas not provided, set a default: higher value for correct label
-        if(self.expertise == LOW_EXPERTISE):
-            self.cm_prob = self.init_cm_prob(target_accuracy=0.4, scale=20.0)
-        elif(self.expertise == MEDIUM_EXPERTISE):
-            self.cm_prob = self.init_cm_prob(target_accuracy=0.5, scale=20.0)
-        elif(self.expertise == HIGH_EXPERTISE):
-            self.cm_prob = self.init_cm_prob(target_accuracy=0.6, scale=20.0)
-        elif(self.expertise == VERY_HIGH_EXPERTISE):
-            self.cm_prob = self.init_cm_prob(target_accuracy=0.8, scale=20.0)
-        elif(self.expertise == EXPERT_EXPERTISE):
-            self.cm_prob = self.init_cm_prob_specialist()
+        if self.expertise == LOW_EXPERTISE:
+            self.cm_prob = self.init_cm_prob_specialist(target_accuracy=0.4, scale=1)
+        elif self.expertise == MEDIUM_EXPERTISE:
+            self.cm_prob = self.init_cm_prob_specialist(target_accuracy=0.6, scale=1)
+        elif self.expertise == HIGH_EXPERTISE:
+            self.cm_prob = self.init_cm_prob_specialist(target_accuracy=0.8, scale=1)
+        elif self.expertise == RANDOM_EXPERTISE:
+            self.cm_prob = self.init_cm_prob_random()
+
+        print(self.repr_cm_prob())
 
         self.cm = np.zeros((self.num_classes, self.num_classes))
         self.cm_ratings = np.zeros((self.num_classes, self.num_classes))
@@ -52,70 +51,108 @@ class Annotator:
         self.current_answer = -1
 
         
-        
 
 
-
-    def init_cm_prob(self, target_accuracy=0.8, scale=20.0):
+    def init_cm_prob_random(self):
         """
-        Inicializa uma matriz de confusão probabilística em que a classe verdadeira
-        tem aproximadamente target_accuracy de chance de ser escolhida.
-        
-        :param target_accuracy: Probabilidade média desejada de acerto (ex: 0.7 para 70%)
-        :param scale: Parâmetro de concentração da Dirichlet (quanto maior, menos variação)
+        Inicializa uma matriz de confusão probabilística totalmente aleatória.
+        Cada linha representa a distribuição de probabilidade das classes preditas
+        para uma classe verdadeira, sem qualquer especialização.
         """
         cm_prob = np.zeros((self.num_classes, self.num_classes))
-        for true_class in range(self.num_classes):
-            alpha_vector = [(1 - target_accuracy) / (self.num_classes - 1) * scale
-                            for _ in range(self.num_classes)]
-            alpha_vector[true_class] = target_accuracy * scale
 
+        for true_class in range(self.num_classes):
+            alpha_vector = [1.0] * self.num_classes  # Distribuição Dirichlet simétrica
             probs = np.random.dirichlet(alpha_vector)
             probs = np.round(probs, 2)
 
-            # Corrige para garantir que a soma seja exatamente 1.0
+            # Corrigir soma para 1.0 (devido ao arredondamento)
             diff = 1.0 - probs.sum()
             probs[np.argmax(probs)] += diff
 
             cm_prob[true_class] = probs
-        return cm_prob
-    
-    def init_cm_prob_specialist(self, expert_accuracy=0.8, min_other_accuracy=0.1, max_other_accuracy=0.5, scale=10.0):
-        """
-        Inicializa uma matriz de confusão probabilística em que o anotador tem alta precisão
-        em apenas uma classe (escolhida aleatoriamente), e acurácia entre 20%-60% nas outras.
 
-        :param expert_accuracy: Probabilidade média desejada de acerto para a classe especialista.
-        :param min_other_accuracy: Acerto mínimo nas outras classes.
-        :param max_other_accuracy: Acerto máximo nas outras classes.
-        :param scale: Parâmetro de concentração da Dirichlet.
+        return cm_prob
+
+
+
+    def init_cm_prob_specialist(self, target_accuracy=0.9, scale=10.0):
+        """
+        Inicializa uma matriz de confusão probabilística com uma classe especialista única,
+        ajustando o fator para atingir a target_accuracy desejada apenas nessa classe.
+
+        As outras classes terão comportamento aleatório (não especialista).
         """
         cm_prob = np.zeros((self.num_classes, self.num_classes))
+        expert_class = np.random.randint(0, self.num_classes)
 
-        # Escolher aleatoriamente a classe especialista
+        # Calcular factor necessário para atingir a target_accuracy
+        denominator = 1.0 - target_accuracy
+        if denominator <= 0:
+            raise ValueError("target_accuracy deve ser < 1.0")
+
+        factor = (self.num_classes - 1) * target_accuracy / denominator
+
+        for true_class in range(self.num_classes):
+            alpha_vector = [1.0 for _ in range(self.num_classes)]
+
+            if true_class == expert_class:
+                alpha_vector[true_class] = factor  # aumenta o alpha só para a classe especialista
+
+            alpha_vector = [a * scale for a in alpha_vector]
+            probs = np.random.dirichlet(alpha_vector)
+            probs = np.round(probs, 2)
+
+            # Corrigir soma
+            diff = 1.0 - probs.sum()
+            probs[np.argmax(probs)] += diff
+
+            cm_prob[true_class] = probs
+
+        return cm_prob
+            
+    
+    """     
+    def init_cm_prob_specialist(self, expert_accuracy=0.8, min_other_accuracy=0.25, max_other_accuracy=0.4, scale=10.0, max_attempts=100):
+        
+        cm_prob = np.zeros((self.num_classes, self.num_classes))
         expert_class = np.random.randint(0, self.num_classes)
 
         for true_class in range(self.num_classes):
-            if true_class == expert_class:
-                target_accuracy = expert_accuracy
-            else:
-                target_accuracy = np.random.uniform(min_other_accuracy, max_other_accuracy)
+            attempts = 0
+            while True:
+                if true_class == expert_class:
+                    target_accuracy = expert_accuracy
+                else:
+                    target_accuracy = np.random.uniform(min_other_accuracy, max_other_accuracy)
 
-            alpha_vector = [(1 - target_accuracy) / (self.num_classes - 1) * scale
-                            for _ in range(self.num_classes)]
-            alpha_vector[true_class] = target_accuracy * scale
+                alpha_vector = [(1 - target_accuracy) / (self.num_classes - 1) * scale
+                                for _ in range(self.num_classes)]
+                alpha_vector[true_class] = target_accuracy * scale
 
-            probs = np.random.dirichlet(alpha_vector)
+                probs = np.random.dirichlet(alpha_vector)
+                value = probs[true_class]
+
+                if true_class == expert_class:
+                    if abs(value - expert_accuracy) < 0.05:  # tolerância de 5%
+                        break
+                else:
+                    if min_other_accuracy <= value <= max_other_accuracy:
+                        break
+
+                attempts += 1
+                if attempts > max_attempts:
+                    # Aceita mesmo que esteja fora do intervalo se exceder número de tentativas
+                    break
+
             probs = np.round(probs, 2)
-
-            # Corrigir soma para 1.0
             diff = 1.0 - probs.sum()
             probs[np.argmax(probs)] += diff
-
             cm_prob[true_class] = probs
 
-        #print(f"Classe especialista do anotador: {expert_class}")
-        return cm_prob
+        return cm_prob 
+        """
+
 
 
     def answer(self, true_label):
@@ -131,7 +168,6 @@ class Annotator:
             result = NEGATIVE_RATING
         else:
             result = POSITIVE_RATING
-            print("POSITIVE RATING")
         other.rating_scores[other.current_answer] += result
 
         self.cm_ratings[true_label, self.current_answer] += 1

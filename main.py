@@ -1,19 +1,14 @@
 import os
 import numpy as np
 import torch
-import torch.optim as optim
-import torch.nn as nn
 from modAL.models import ActiveLearner
 from sklearn.model_selection import train_test_split
-from sklearn.model_selection import StratifiedShuffleSplit
-from torch.utils.data import Subset, DataLoader, random_split, ConcatDataset
+from torch.utils.data import Subset, DataLoader, ConcatDataset
 from torchvision import datasets, transforms
-from entities.Annotator import Annotator
 from entities.Committee import Committee
 from entities.LeNet5 import LeNet5
 from env import *
 from collections import Counter
-from utils.DataManager import *
 from utils.utils import *
 import warnings
 import argparse
@@ -21,8 +16,6 @@ import argparse
 warnings.filterwarnings("ignore", category=FutureWarning)
     
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-#device = "cpu"
-
 print("Using device:", device)
 
 DATASET_IN_USE = "None"
@@ -30,6 +23,7 @@ QUERY_STRATEGY_IN_USE = "None"
 ORACLE_ANSWER_IN_USE = "None"
 EXPERTISE_IN_USE = "None"
 ORACLE_SIZE_IN_USE = 0
+RATING_FLAG = "None"
 
 def create_results_dir(seed):
     if QUERY_STRATEGY_IN_USE == margin_sampling:
@@ -41,12 +35,10 @@ def create_results_dir(seed):
     else:
         query_strategy = f"random_sampling"
     
-    if ORACLE_ANSWER_IN_USE in (ORACLE_ANSWER_REPUTATION, ORACLE_ANSWER_MAJORITY_VOTING):
-        # runs/CIFAR/uncertainty_sampling/reputation_based/H/30/results_0
-        results_dir_path = os.path.join(RESULTS_PATH, DATASET_IN_USE, query_strategy, ORACLE_ANSWER_IN_USE, str(ORACLE_SIZE_IN_USE), EXPERTISE_IN_USE, f"results_{seed}")
+    if ORACLE_ANSWER_IN_USE == ORACLE_ANSWER_REPUTATION:
+        results_dir_path = os.path.join(RESULTS_PATH, DATASET_IN_USE, query_strategy, ORACLE_ANSWER_IN_USE, RATING_FLAG, str(ORACLE_SIZE_IN_USE), EXPERTISE_IN_USE, f"results_{seed}")
 
     else:
-        # runs/CIFAR/uncertainty_sampling/random_answer/results_0
         results_dir_path = os.path.join(RESULTS_PATH, DATASET_IN_USE, query_strategy, ORACLE_ANSWER_IN_USE, f"results_{seed}")
 
     os.makedirs(results_dir_path, exist_ok=True)
@@ -60,8 +52,6 @@ def select_answer_type(oracle, true_labels):
         for true_label in true_labels:
             if(ORACLE_ANSWER_IN_USE == ORACLE_ANSWER_REPUTATION): 
                 ans = oracle.weight_reputation_answer(true_target=true_label)
-            elif(ORACLE_ANSWER_IN_USE == ORACLE_ANSWER_MAJORITY_VOTING):
-                ans = oracle.majority_voting_answer(true_target=true_label)
             elif(ORACLE_ANSWER_IN_USE == ORACLE_ANSWER_RANDOM):
                 ans = oracle.random_answer(true_target=true_label)
             answers.append(ans)
@@ -116,7 +106,7 @@ def init_active_learning_pool(train_loader, val_loader, test_loader, seed):
     init_metrics = learner.estimator.evaluate(x_val, y_val)
     write_metrics_to_csv(results_path, results_file, cycle=0, oracle_label=-1, ground_truth_label=-1,  metrics=init_metrics, oracle_cm=-1, oracle_iterations=-1)
 
-    oracle = Committee(size=ORACLE_SIZE_IN_USE, seed=seed, expertise=EXPERTISE_IN_USE, results_path=results_path)
+    oracle = Committee(size=ORACLE_SIZE_IN_USE, seed=seed, expertise=EXPERTISE_IN_USE, results_path=results_path, rating_flag=RATING_FLAG)
     
     # --- loop de Active Learning em batch ---
     for cycle in range(NUM_CYCLES):
@@ -174,6 +164,7 @@ def init_perm_statistic(train_loader, val_loader, test_loader):
         print(f"Oracle Size: {ORACLE_SIZE_IN_USE}")
         print(f"Oracle Answer: {ORACLE_ANSWER_IN_USE}")
         print(f"Annotator Expertise: {EXPERTISE_IN_USE}")
+        print(f"Rating Flag: {RATING_FLAG}")
         print(f"Learning Rate: {LEARNING_RATE}")
         print(f"Epochs: {EPHOCS}")
         print(f"Init training (%): {INIT_TRAINING_PERCENTAGE * 100}%")
@@ -186,20 +177,22 @@ def init_perm_oracle_answer(train_loader, val_loader, test_loader):
     global ORACLE_ANSWER_IN_USE
     global EXPERTISE_IN_USE
     global ORACLE_SIZE_IN_USE
-    
+    global RATING_FLAG 
+
+    # random_answer , reputation_based. ground_truth
     for ORACLE_ANSWER_IN_USE in ORACLE_ANSWERS:
-        if ORACLE_ANSWER_IN_USE in (ORACLE_ANSWER_REPUTATION, ORACLE_ANSWER_MAJORITY_VOTING):
-            # L, M, H
-            for ORACLE_SIZE_IN_USE in ORACLE_SIZES:
-                # 5, 15, 30 
-                for EXPERTISE_IN_USE in EXPERTISES:
-                    init_perm_statistic(train_loader=train_loader, val_loader=val_loader, test_loader=test_loader)
+        if ORACLE_ANSWER_IN_USE  == ORACLE_ANSWER_REPUTATION:
+            
+            for ORACLE_SIZE_IN_USE in ORACLE_SIZES: # 5, 15, 30
+                 
+                for EXPERTISE_IN_USE in EXPERTISES: # L, M, H, R
+                    
+                    for RATING_FLAG in RATINGS_PERMUTATIONS: # with_rating, without_rating
+                        init_perm_statistic(train_loader=train_loader, val_loader=val_loader, test_loader=test_loader)
         else:
             init_perm_statistic(train_loader=train_loader, val_loader=val_loader, test_loader=test_loader)
  
             
-    #ORACLE_ANSWER_IN_USE = ORACLE_ANSWER_GROUND_TRUTH
-    #init_perm_statistic(train_loader=train_loader, val_loader=val_loader, test_loader=test_loader)
 
 def init_perm_query_strategy(train_loader, val_loader, test_loader):
     global QUERY_STRATEGY_IN_USE
@@ -234,7 +227,10 @@ def main(dataset):
     elif DATASET_IN_USE == DATASET_EMNIST_DIGITS:
         train_data = datasets.EMNIST(root='./data', split='digits', train=True, download=True, transform=transform)
         test_data = datasets.EMNIST(root='./data', split='digits', train=False, download=True, transform=transform)
-
+    
+    elif DATASET_IN_USE == DATASET_SVHN:
+        train_data = datasets.SVHN(root='./data', split='train', download=True, transform=transform)
+        test_data = datasets.SVHN(root='./data', split='test', download=True, transform=transform)
     else:
         raise ValueError(f"Invalid Dataset : {DATASET_IN_USE}")
         
