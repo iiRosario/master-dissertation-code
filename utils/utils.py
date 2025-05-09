@@ -1,15 +1,17 @@
+from env import *
 import numpy as np
+from torch.utils.data import Subset
 import os
 import matplotlib.pyplot as plt
 import torch
-from torch.utils.data import Subset
 from collections import Counter
-from env import *
 import csv
 import pandas as pd
 from torchvision.transforms import functional as F
 from matplotlib.ticker import MaxNLocator
 import matplotlib.cm as cm
+from PIL import Image
+
 
 CLASS_COLORS = ['royalblue', 'tomato', 'goldenrod','mediumseagreen', 'orchid', 'slateblue',  'darkorange', 'turquoise', 'firebrick', 'deeppink']
 
@@ -18,15 +20,23 @@ def get_label_distribution(dataset):
     labels = [dataset[i][1] for i in range(len(dataset))]
     return Counter(labels)
 
-def plot_distribution(distribution, split_name, save_path='.', colors=CLASS_COLORS):
+def plot_distribution(dataset, distribution, split_name, save_path='.', colors=CLASS_COLORS):
     classes = sorted(distribution.keys())
     counts = [distribution[c] for c in classes]
+
+    if dataset == "CIFAR-10":
+        dataset = "CIFAR 10"
+    elif dataset == "MNIST_FASHION":
+        dataset = "MNIST Fashion"
+    elif dataset == "EMNIST_DIGITS":
+        dataset = "EMNIST Digits"
+
 
     plt.figure(figsize=(6, 4))
     plt.bar([str(c) for c in classes], counts, color=colors[:len(classes)])
     plt.xlabel('Class')
-    plt.ylabel('Number of Samples')
-    plt.title(f'Class Distribution - {split_name}')
+    plt.ylabel('Nº of Samples')
+    plt.title(f'{dataset} dataset distribution - {split_name}')
     plt.tight_layout()
 
     os.makedirs(save_path, exist_ok=True)
@@ -80,40 +90,90 @@ def plot_sample_images(dataset, classes, num_samples=6):
 
 
 
-def plot_sample_images(dataset, classes=[0, 1, 2], num_samples=3):
-    # Mapear as classes numéricas para seus respectivos nomes no FashionMNIST ou CIFAR-10
-    class_names = ['T-shirt/top', 'Trouser', 'Pullover']  # Para FashionMNIST (adaptar para CIFAR-10)
+def plot_sample_images(dataset, classes, num_samples=5, num_classes=10, save_path='sample_plot.png'):
+    """
+    Plota e salva uma grade de imagens com uma coluna por classe e uma linha por amostra.
 
-    # Criar um dicionário para armazenar imagens de cada classe
+    Parâmetros:
+        dataset (torch.utils.data.Dataset): Dataset PyTorch (ex: CIFAR-10, FashionMNIST, MNIST, EMNIST).
+        classes (list): Lista de índices das classes a visualizar (1 por coluna).
+        num_samples (int): Número de imagens por classe (1 por linha).
+        num_classes (int): Número de classes a incluir no plot (limita o tamanho de `classes`).
+        save_path (str): Caminho para salvar a figura gerada.
+    """
+
+    # Reduzir a lista de classes conforme o limite desejado
+    classes = classes[:num_classes]
+
+    # Identificar o nome do dataset
+    dataset_name = dataset.__class__.__name__
+
+    if 'CIFAR10' in dataset_name:
+        all_class_names = [
+            'airplane', 'automobile', 'bird', 'cat', 'deer',
+            'dog', 'frog', 'horse', 'ship', 'truck'
+        ]
+    elif 'FashionMNIST' in dataset_name:
+        all_class_names = [
+            'T-shirt/top', 'Trouser', 'Pullover', 'Dress', 'Coat',
+            'Sandal', 'Shirt', 'Sneaker', 'Bag', 'Ankle boot'
+        ]
+    elif 'MNIST' in dataset_name and 'Fashion' not in dataset_name:
+        all_class_names = [str(i) for i in range(10)]
+    elif 'EMNIST' in dataset_name:
+        all_class_names = [chr(i) for i in range(ord('A'), ord('Z') + 1)]
+    elif 'SVHN' in dataset_name:
+        all_class_names = [str(i) for i in range(10)]
+    else:
+        all_class_names = [str(i) for i in range(100)]
+
+    is_emnist_letters = 'EMNIST' in dataset_name and max(classes) > 9
+
+    class_names = {}
+    for i in classes:
+        if is_emnist_letters:
+            class_names[i] = all_class_names[i - 1]
+        else:
+            class_names[i] = all_class_names[i]
+
     class_images = {cls: [] for cls in classes}
     
-    # Encontrar 'num_samples' imagens para cada classe
     for img, label in dataset:
+        label = label.item() if isinstance(label, torch.Tensor) else label
         if label in classes and len(class_images[label]) < num_samples:
             class_images[label].append(img)
-        
-        # Stop early if we have enough images for all classes
         if all(len(class_images[cls]) >= num_samples for cls in classes):
             break
-    
-    # Criar as subplots para as imagens por classe (matriz)
-    fig, axes = plt.subplots(len(classes), num_samples, figsize=(15, 5))
-    
-    for i, cls in enumerate(classes):
-        for j, img in enumerate(class_images[cls]):
-            # Verificar se a imagem é RGB ou em escala de cinza
-            if img.ndimension() == 3:  # RGB (C, H, W)
-                img = img.permute(1, 2, 0)  # Transforma para (H, W, C)
-            
-            axes[i, j].imshow(img.squeeze(), cmap='gray' if img.ndimension() == 2 else None)
-            axes[i, j].set_xticks([])  # Remover marcações do eixo X
-            axes[i, j].set_yticks([])  # Remover marcações do eixo Y
-            
-        # Definir o título da linha (para todas as imagens dessa classe)
-        axes[i, 0].set_ylabel(f"{class_names[cls]}", fontsize=14)
-    
+
+    fig, axes = plt.subplots(num_samples, len(classes), figsize=(len(classes)*2.5, num_samples*2.5))
+
+    if num_samples == 1:
+        axes = axes.reshape(1, -1)
+    if len(classes) == 1:
+        axes = axes.reshape(-1, 1)
+
+    for col, cls in enumerate(classes):
+        for row, img in enumerate(class_images[cls]):
+            ax = axes[row, col]
+
+            if isinstance(img, Image.Image):
+                img = to_tensor(img)
+
+            if img.min() < 0:
+                img = img * 0.5 + 0.5
+
+            if img.ndimension() == 3:
+                img = img.permute(1, 2, 0)
+
+            ax.imshow(img.squeeze(), cmap='gray' if img.ndimension() == 2 or img.shape[-1] == 1 else None)
+            ax.axis('off')  # <-- Aqui desativa os eixos
+
+        axes[0, col].set_title(class_names[cls], fontsize=12)
+
     plt.tight_layout()
+    plt.savefig(save_path)
     plt.show()
+    plt.close()
 
 # Filter dataset for selected classes (e.g., [0, 1, 2])
 def filter_classes(dataset, classes=[0, 1, 2]):

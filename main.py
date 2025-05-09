@@ -210,30 +210,38 @@ def main(dataset):
 
     path_dir = os.path.join(RESULTS_PATH, DATASET_IN_USE)
 
-    transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.5,), (0.5,))])
-
+    transform_28_28 = transform = transforms.Compose([transforms.Pad(2), 
+                                                    transforms.ToTensor(), 
+                                                    transforms.Normalize((0.5,), (0.5,))])
+    transform_32_32 = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.5,), (0.5,))])
+   
     if DATASET_IN_USE == DATASET_MNIST:
-        train_data = datasets.MNIST(root='./data', train=True, download=True, transform=transform)
-        test_data = datasets.MNIST(root='./data', train=False, download=True, transform=transform)
+        train_data = datasets.MNIST(root='./data', train=True, download=True, transform=transform_28_28)
+        test_data = datasets.MNIST(root='./data', train=False, download=True, transform=transform_28_28)
 
     elif DATASET_IN_USE == DATASET_MNIST_FASHION:
-        train_data = datasets.FashionMNIST(root='./data', train=True, download=True, transform=transform)
-        test_data = datasets.FashionMNIST(root='./data', train=False, download=True, transform=transform)
+        train_data = datasets.FashionMNIST(root='./data', train=True, download=True, transform=transform_28_28)
+        test_data = datasets.FashionMNIST(root='./data', train=False, download=True, transform=transform_28_28)
 
     elif DATASET_IN_USE == DATASET_CIFAR_10:
-        train_data = datasets.CIFAR10(root='./data', train=True, download=True, transform=transform)
-        test_data = datasets.CIFAR10(root='./data', train=False, download=True, transform=transform)
+        train_data = datasets.CIFAR10(root='./data', train=True, download=True, transform=transform_32_32)
+        test_data = datasets.CIFAR10(root='./data', train=False, download=True, transform=transform_32_32)
 
     elif DATASET_IN_USE == DATASET_EMNIST_DIGITS:
-        train_data = datasets.EMNIST(root='./data', split='digits', train=True, download=True, transform=transform)
-        test_data = datasets.EMNIST(root='./data', split='digits', train=False, download=True, transform=transform)
+        train_data = datasets.EMNIST(root='./data', split='digits', train=True, download=True, transform=transform_28_28)
+        test_data = datasets.EMNIST(root='./data', split='digits', train=False, download=True, transform=transform_28_28)
+    
+    elif DATASET_IN_USE == DATASET_EMNIST_LETTERS:
+        train_data = datasets.EMNIST(root='./data', split='letters', train=True, download=True, transform=transform_28_28)
+        test_data = datasets.EMNIST(root='./data', split='letters', train=False, download=True, transform=transform_28_28)
     
     elif DATASET_IN_USE == DATASET_SVHN:
         train_data = datasets.SVHN(root='./data', split='train', download=True, transform=transform)
         test_data = datasets.SVHN(root='./data', split='test', download=True, transform=transform)
     else:
         raise ValueError(f"Invalid Dataset : {DATASET_IN_USE}")
-        
+    
+    plot_sample_images(dataset=test_data, classes=CLASSES, num_samples=5, save_path=path_dir)    
 
     train_data = filter_classes(train_data, classes=CLASSES)
     test_data = filter_classes(test_data, classes=CLASSES)
@@ -261,10 +269,11 @@ def main(dataset):
     test_dist = get_label_distribution(test_set)
     
     save_class_distributions_to_csv(train_dist, val_dist, test_dist, path_dir)
-    plot_distribution(train_dist, "Train", save_path=path_dir, colors=CLASS_COLORS)
-    plot_distribution(val_dist, "Validation", save_path=path_dir, colors=CLASS_COLORS)
-    plot_distribution(test_dist, "Test", save_path=path_dir, colors=CLASS_COLORS)
+    plot_distribution(dataset=DATASET_IN_USE, distribution=train_dist, split_name="Train", save_path=path_dir, colors=CLASS_COLORS)
+    plot_distribution(dataset=DATASET_IN_USE, distribution=val_dist, split_name="Validation", save_path=path_dir, colors=CLASS_COLORS)
+    plot_distribution(dataset=DATASET_IN_USE, distribution=test_dist, split_name="Test", save_path=path_dir, colors=CLASS_COLORS)
 
+    
     train_loader = DataLoader(train_set, batch_size=64, shuffle=True)
     val_loader = DataLoader(val_set, batch_size=64, shuffle=True)
     test_loader = DataLoader(test_set, batch_size=64, shuffle=True)

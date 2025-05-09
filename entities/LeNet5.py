@@ -19,7 +19,7 @@ class LeNet5(nn.Module):
         self.lr = lr
         self.batch_size = batch_size
 
-        if dataset in (DATASET_CIFAR_10 or DATASET_SVHN): 
+        if dataset in (DATASET_CIFAR_10, DATASET_SVHN):
             in_channels = 3
         else:
             in_channels = 1
@@ -30,15 +30,8 @@ class LeNet5(nn.Module):
         # Camada 2: Convolucional com 16 filtros de 5x5
         self.conv2 = nn.Conv2d(6, 16, kernel_size=5)
         
-
-        if dataset in (DATASET_CIFAR_10 or DATASET_SVHN):
-            # Após conv1 (6 filtros 5x5) + pool: 28x28 -> 14x14
-            # Após conv2 (16 filtros 5x5) + pool: 10x10 -> 5x5
-            fc_input_size = 16 * 5 * 5  # 16 filtros, cada um de tamanho 5x5 após pooling
-        else:
-             # Para MNIST, a entrada é 28x28 e a estrutura é similar.
-            fc_input_size = 16 * 4 * 4  # Após as camadas convolucionais e pooling
-
+        fc_input_size = 16 * 5 * 5  # 16 filtros, cada um de tamanho 5x5 após pooling
+    
         self.fc1 = nn.Linear(fc_input_size, 120)
         self.fc2 = nn.Linear(120, 84)
         self.fc3 = nn.Linear(84, len(CLASSES))
@@ -104,6 +97,7 @@ class LeNet5(nn.Module):
             outputs = self(X_tensor)  
             _, predicted = torch.max(outputs, 1)
         return predicted.cpu().numpy()
+    
 
     def predict_proba(self, X):
         self.eval()  # Coloca o modelo no modo de avaliação

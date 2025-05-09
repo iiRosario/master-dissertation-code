@@ -27,7 +27,7 @@ class Committee:
             else:                                       
                 alpha, beta = 0.5, 0.5  
 
-            print(f"alpha: {alpha}, beta: {beta}")
+            #print(f"alpha: {alpha}, beta: {beta}")
             ann = Annotator(id=i, seed=seed+i, num_classes=len(CLASSES), alpha=alpha, beta=beta, expertise=expertise)
             self.annotators.append(ann)
     
