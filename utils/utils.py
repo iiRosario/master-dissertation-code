@@ -25,23 +25,15 @@ def get_label_distribution(dataset):
     labels = [dataset[i][1] for i in range(len(dataset))]
     return Counter(labels)
 
-def plot_distribution(dataset, distribution, split_name, save_path='.', colors=CLASS_COLORS):
+def plot_distribution(distribution, split_name, save_path='.', colors=CLASS_COLORS, title=""):
     classes = sorted(distribution.keys())
     counts = [distribution[c] for c in classes]
-
-    if dataset == "CIFAR-10":
-        dataset = "CIFAR 10"
-    elif dataset == "MNIST_FASHION":
-        dataset = "MNIST-Fashion"
-    elif dataset == "EMNIST_LETTERS":
-        dataset = "EMNIST-Letters"
-
 
     plt.figure(figsize=(6, 4))
     plt.bar([str(c) for c in classes], counts, color=colors[:len(classes)])
     plt.xlabel('Class')
     plt.ylabel('Nº of Samples')
-    plt.title(f'{dataset} dataset distribution - {split_name}')
+    plt.title(title)
     plt.tight_layout()
 
     os.makedirs(save_path, exist_ok=True)
@@ -74,25 +66,6 @@ def plot_distribution_2(distribution, split_name, colors=CLASS_COLORS, save_path
     plt.savefig(full_path)
     plt.close()
     print(f"Saved: {full_path}")
-
-def plot_sample_images(dataset, classes, num_samples=6):
-    fig, axes = plt.subplots(1, num_samples, figsize=(15, 15))
-
-    for i in range(num_samples):
-        # Pega uma amostra aleatória do dataset
-        img, label = dataset[i]
-        
-        # Se a imagem for 3D (RGB), exibe diretamente
-        if img.ndimension() == 3:  # (C, H, W) para CIFAR
-            img = img.permute(1, 2, 0)  # Transforma para (H, W, C)
-
-        axes[i].imshow(img)  # Exibe a imagem
-        axes[i].axis('off')  # Desliga os eixos
-        axes[i].set_title(f"Class: {classes[label.item()]}")
-    
-    plt.tight_layout()
-    plt.show()
-
 
 
 def plot_sample_images(dataset, classes, num_samples=5, num_classes=5, save_path='sample_plot.png'):
@@ -148,9 +121,12 @@ def plot_sample_images(dataset, classes, num_samples=5, num_classes=5, save_path
             ax.set_visible(False)
 
     plt.tight_layout()
-    plt.savefig(save_path)
-    #plt.show()
-    #plt.close()
+
+    os.makedirs(save_path, exist_ok=True)
+    path = os.path.join(save_path, "sample_images.png")
+    # Salva o plot
+    plt.savefig(path, bbox_inches='tight')  # bbox_inches evita corte de rótulos
+    plt.close()
 
 
 # Filter dataset for selected classes (e.g., [0, 1, 2])
@@ -279,13 +255,54 @@ def plot_all_metrics_over_cycles(csv_path, plot_path, seed):
                             variable="precision_per_class",
                             filename=f"precision_{seed}")
 
-
-
-
 def avg_metric(metrics, variable):
     variable_list = [float(a) for a in metrics[variable]]
     avg_variable = sum(variable_list) / len(variable_list)
     return avg_variable
+
+def plot_original_data(dataset, train_data, test_data, path_dir):
+
+    train_dist = get_label_distribution(train_data)
+    test_dist = get_label_distribution(test_data)
+
+    if dataset == "CIFAR-10":
+        dataset = "CIFAR 10"
+    elif dataset == "MNIST_FASHION":
+        dataset = "MNIST-Fashion"
+    elif dataset == "EMNIST_LETTERS":
+        dataset = "EMNIST-Letters"
+
+
+    title_train = f"Train Distribution - {dataset}"
+    title_test = f"Test Distribution - {dataset}"
+    plot_distribution(train_dist, "Original Train", path_dir, CLASS_COLORS, title_train)
+    plot_distribution(test_dist, "Original Test", path_dir, CLASS_COLORS, title_test)
+
+
+def plot_divided_data(dataset, full_set, train_set, val_set, test_set, path_dir):
+    f"Train Distribution - {dataset}"
+    full_dist = get_label_distribution(full_set)
+    train_dist = get_label_distribution(train_set)
+    val_dist = get_label_distribution(val_set)
+    test_dist = get_label_distribution(test_set)
+
+    if dataset == "CIFAR-10":
+        dataset = "CIFAR 10"
+    elif dataset == "MNIST_FASHION":
+        dataset = "MNIST-Fashion"
+    elif dataset == "EMNIST_LETTERS":
+        dataset = "EMNIST-Letters"
+
+    title_train = f"Train Distribution - {dataset}"
+    title_val = f"Validation Distribution - {dataset}"
+    title_test = f"Test Distribution - {dataset}"
+    title_full = f"Full Class Distribution - {dataset}"
+    
+    save_class_distributions_to_csv(train_dist, val_dist, test_dist, path_dir)
+    plot_distribution(train_dist, "Train", path_dir, CLASS_COLORS, title_train)
+    plot_distribution(val_dist, "Validation", path_dir, CLASS_COLORS, title_val)
+    plot_distribution(test_dist, "Test", path_dir, CLASS_COLORS, title_test)
+    plot_distribution(full_dist, "Full", path_dir, CLASS_COLORS, title_full)
 
 ############################### DATA AUGMENTATION ###############################
 # Função para adicionar ruído aos dados de entrada

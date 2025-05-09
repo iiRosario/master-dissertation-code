@@ -270,24 +270,17 @@ def main(dataset):
         raise ValueError(f"Invalid Dataset : {DATASET_IN_USE}")
     
     plot_sample_images(dataset=test_data, classes=CLASSES, num_samples=5, num_classes=10, save_path=path_dir)    
-    
+    plot_original_data(DATASET_IN_USE, train_data, test_data, path_dir)
+
+
     train_data = filter_classes(train_data, classes=CLASSES)
     test_data = filter_classes(test_data, classes=CLASSES)
     full_dataset = ConcatDataset([train_data, test_data])
 
     train_set, val_set, test_set = stratified_split(full_dataset, TRAIN_SIZE_PERCENTAGE, VAL_SIZE_PERCENTAGE, TEST_SIZE_PERCENTAGE)
 
-    full_dist = get_label_distribution(full_dataset)
-    train_dist = get_label_distribution(train_set)
-    val_dist = get_label_distribution(val_set)
-    test_dist = get_label_distribution(test_set)
-    
-    save_class_distributions_to_csv(train_dist, val_dist, test_dist, path_dir)
-    plot_distribution(DATASET_IN_USE, train_dist, "Train", path_dir, CLASS_COLORS)
-    plot_distribution(DATASET_IN_USE, val_dist, "Validation", path_dir, CLASS_COLORS)
-    plot_distribution(DATASET_IN_USE, test_dist, "Test", path_dir, CLASS_COLORS)
-    plot_distribution(DATASET_IN_USE, full_dist, "Full", path_dir, CLASS_COLORS)
-    
+    plot_divided_data(dataset, full_dataset, train_set, val_set, test_set, path_dir)
+
     
     train_loader = DataLoader(train_set, batch_size=64, shuffle=True)
     val_loader = DataLoader(val_set, batch_size=64, shuffle=True)
