@@ -12,6 +12,7 @@ from collections import Counter
 from utils.utils import *
 import warnings
 import argparse
+from PIL import ImageOps
 
 warnings.filterwarnings("ignore", category=FutureWarning)
     
@@ -24,6 +25,21 @@ ORACLE_ANSWER_IN_USE = "None"
 EXPERTISE_IN_USE = "None"
 ORACLE_SIZE_IN_USE = 0
 RATING_FLAG = "None"
+
+TIN_IMAGENET_URL = 'http://cs231n.stanford.edu/tiny-imagenet-200.zip'
+
+# Download + unzip se necessário
+def download_and_extract_tiny_imagenet():
+    if not os.path.exists(TIN_IMAGENET_DIR):
+        print("Downloading Tiny ImageNet...")
+        urllib.request.urlretrieve(TIN_IMAGENET_URL, TIN_IMAGENET_ZIP)
+        print("Extracting Tiny ImageNet...")
+        with zipfile.ZipFile(TIN_IMAGENET_ZIP, 'r') as zip_ref:
+            zip_ref.extractall('./data/')
+        print("Done.")
+
+
+
 
 def create_results_dir(seed):
     if QUERY_STRATEGY_IN_USE == margin_sampling:
@@ -43,7 +59,6 @@ def create_results_dir(seed):
 
     os.makedirs(results_dir_path, exist_ok=True)
     return results_dir_path
-
 
 def select_answer_type(oracle, true_labels):
 
@@ -154,7 +169,6 @@ def init_active_learning_pool(train_loader, val_loader, test_loader, seed):
     print("Done for seed:", seed)
 
 
-
 def init_perm_statistic(train_loader, val_loader, test_loader):
     
     for seed in range(30):
@@ -215,6 +229,15 @@ def main(dataset):
                                                     transforms.Normalize((0.5,), (0.5,))])
     transform_32_32 = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.5,), (0.5,))])
    
+    transform_emnist_fixed = transforms.Compose([
+        transforms.Pad(2),
+        transforms.Lambda(lambda img: ImageOps.mirror(img)),  # espelha horizontalmente
+        transforms.Lambda(lambda img: img.rotate(+90, expand=True)),  # gira 90° no sentido horário
+        transforms.ToTensor(),
+        transforms.Normalize((0.5,), (0.5,))
+    ])
+
+
     if DATASET_IN_USE == DATASET_MNIST:
         train_data = datasets.MNIST(root='./data', train=True, download=True, transform=transform_28_28)
         test_data = datasets.MNIST(root='./data', train=False, download=True, transform=transform_28_28)
@@ -226,53 +249,45 @@ def main(dataset):
     elif DATASET_IN_USE == DATASET_CIFAR_10:
         train_data = datasets.CIFAR10(root='./data', train=True, download=True, transform=transform_32_32)
         test_data = datasets.CIFAR10(root='./data', train=False, download=True, transform=transform_32_32)
+    elif DATASET_IN_USE == DATASET_TINY_IMAGENET:
+        download_and_extract_tiny_imagenet()
 
-    elif DATASET_IN_USE == DATASET_EMNIST_DIGITS:
-        train_data = datasets.EMNIST(root='./data', split='digits', train=True, download=True, transform=transform_28_28)
-        test_data = datasets.EMNIST(root='./data', split='digits', train=False, download=True, transform=transform_28_28)
-    
+        transform_tiny = transforms.Compose([
+            transforms.Resize((32, 32)),
+            transforms.ToTensor()
+        ])
+
+        train_data = ImageFolder(root=os.path.join(TIN_IMAGENET_DIR, 'train'), transform=transform_tiny)
+        val_data_dir = os.path.join(TIN_IMAGENET_DIR, 'val', 'images')
+
+        # OBS: Tiny ImageNet 'val' precisa ser reestruturado com subpastas por classe para ImageFolder
+        test_data = ImageFolder(root=val_data_dir, transform=transform_tiny)
     elif DATASET_IN_USE == DATASET_EMNIST_LETTERS:
-        train_data = datasets.EMNIST(root='./data', split='letters', train=True, download=True, transform=transform_28_28)
-        test_data = datasets.EMNIST(root='./data', split='letters', train=False, download=True, transform=transform_28_28)
+        train_data = datasets.EMNIST(root='./data', split='letters', train=True, download=True, transform=transform_emnist_fixed)
+        test_data = datasets.EMNIST(root='./data', split='letters', train=False, download=True, transform=transform_emnist_fixed)
     
-    elif DATASET_IN_USE == DATASET_SVHN:
-        train_data = datasets.SVHN(root='./data', split='train', download=True, transform=transform)
-        test_data = datasets.SVHN(root='./data', split='test', download=True, transform=transform)
     else:
         raise ValueError(f"Invalid Dataset : {DATASET_IN_USE}")
     
-    plot_sample_images(dataset=test_data, classes=CLASSES, num_samples=5, save_path=path_dir)    
-
+    plot_sample_images(dataset=test_data, classes=CLASSES, num_samples=5, num_classes=10, save_path=path_dir)    
+    
     train_data = filter_classes(train_data, classes=CLASSES)
     test_data = filter_classes(test_data, classes=CLASSES)
-
     full_dataset = ConcatDataset([train_data, test_data])
 
-    total_size = len(full_dataset)
-    train_size = int(TRAIN_SIZE_PERCENTAGE * total_size)
-    test_size = int(TEST_SIZE_PERCENTAGE * total_size)
-    val_size = total_size - train_size - test_size
+    train_set, val_set, test_set = stratified_split(full_dataset, TRAIN_SIZE_PERCENTAGE, VAL_SIZE_PERCENTAGE, TEST_SIZE_PERCENTAGE)
 
-    # Índices sequenciais
-    all_indices = list(range(total_size))
-    train_indices = all_indices[:train_size]
-    test_indices = all_indices[train_size:train_size + test_size]
-    val_indices = all_indices[train_size + test_size:]
-
-    # Subsets finais
-    train_set = Subset(full_dataset, train_indices)
-    val_set = Subset(full_dataset, val_indices)
-    test_set = Subset(full_dataset, test_indices)
-
+    full_dist = get_label_distribution(full_dataset)
     train_dist = get_label_distribution(train_set)
     val_dist = get_label_distribution(val_set)
     test_dist = get_label_distribution(test_set)
     
     save_class_distributions_to_csv(train_dist, val_dist, test_dist, path_dir)
-    plot_distribution(dataset=DATASET_IN_USE, distribution=train_dist, split_name="Train", save_path=path_dir, colors=CLASS_COLORS)
-    plot_distribution(dataset=DATASET_IN_USE, distribution=val_dist, split_name="Validation", save_path=path_dir, colors=CLASS_COLORS)
-    plot_distribution(dataset=DATASET_IN_USE, distribution=test_dist, split_name="Test", save_path=path_dir, colors=CLASS_COLORS)
-
+    plot_distribution(DATASET_IN_USE, train_dist, "Train", path_dir, CLASS_COLORS)
+    plot_distribution(DATASET_IN_USE, val_dist, "Validation", path_dir, CLASS_COLORS)
+    plot_distribution(DATASET_IN_USE, test_dist, "Test", path_dir, CLASS_COLORS)
+    plot_distribution(DATASET_IN_USE, full_dist, "Full", path_dir, CLASS_COLORS)
+    
     
     train_loader = DataLoader(train_set, batch_size=64, shuffle=True)
     val_loader = DataLoader(val_set, batch_size=64, shuffle=True)

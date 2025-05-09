@@ -19,7 +19,7 @@ class LeNet5(nn.Module):
         self.lr = lr
         self.batch_size = batch_size
 
-        if dataset in (DATASET_CIFAR_10, DATASET_SVHN):
+        if dataset in (DATASET_CIFAR_10, DATASET_CIFAR_100):
             in_channels = 3
         else:
             in_channels = 1

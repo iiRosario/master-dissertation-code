@@ -29,7 +29,7 @@ class Annotator:
         elif self.expertise == RANDOM_EXPERTISE:
             self.cm_prob = self.init_cm_prob_random()
 
-        #print(self.repr_cm_prob())
+        print(self.repr_cm_prob())
 
         self.cm = np.zeros((self.num_classes, self.num_classes))
         self.cm_ratings = np.zeros((self.num_classes, self.num_classes))
@@ -76,34 +76,45 @@ class Annotator:
 
 
 
-    def init_cm_prob_specialist(self, target_accuracy=0.9, scale=10.0):
+    def init_cm_prob_specialist(self, target_accuracy=0.9, non_expert_accuracy=0.2, scale=10.0):
         """
-        Inicializa uma matriz de confusão probabilística com uma classe especialista única,
-        ajustando o fator para atingir a target_accuracy desejada apenas nessa classe.
+        Inicializa uma matriz de confusão probabilística:
+        - Uma classe especialista com acurácia alta (target_accuracy)
+        - Outras classes com comportamento "aleatório informado" com acurácia média (non_expert_accuracy)
 
-        As outras classes terão comportamento aleatório (não especialista).
+        Parâmetros:
+            target_accuracy (float): Acurácia desejada para a classe especialista (0 < acc < 1)
+            non_expert_accuracy (float): Acurácia média para as demais classes (0 < acc < 1)
+            scale (float): Fator multiplicativo da Dirichlet (maior = mais determinístico)
         """
+        if not (0 < target_accuracy < 1.0) or not (0 < non_expert_accuracy < 1.0):
+            raise ValueError("Acurácias devem estar no intervalo (0, 1)")
+
         cm_prob = np.zeros((self.num_classes, self.num_classes))
         expert_class = np.random.randint(0, self.num_classes)
 
-        # Calcular factor necessário para atingir a target_accuracy
-        denominator = 1.0 - target_accuracy
-        if denominator <= 0:
-            raise ValueError("target_accuracy deve ser < 1.0")
+        # Fator para classe especialista
+        denom_expert = 1.0 - target_accuracy
+        factor_expert = (self.num_classes - 1) * target_accuracy / denom_expert
 
-        factor = (self.num_classes - 1) * target_accuracy / denominator
+        # Fator para classes não especialistas
+        denom_non_expert = 1.0 - non_expert_accuracy
+        factor_non_expert = (self.num_classes - 1) * non_expert_accuracy / denom_non_expert
 
         for true_class in range(self.num_classes):
-            alpha_vector = [1.0 for _ in range(self.num_classes)]
-
             if true_class == expert_class:
-                alpha_vector[true_class] = factor  # aumenta o alpha só para a classe especialista
+                factor = factor_expert
+            else:
+                factor = factor_non_expert
 
+            alpha_vector = [1.0 for _ in range(self.num_classes)]
+            alpha_vector[true_class] = factor  # aumenta o alpha na posição correta
             alpha_vector = [a * scale for a in alpha_vector]
+            #print(alpha_vector)
             probs = np.random.dirichlet(alpha_vector)
             probs = np.round(probs, 2)
 
-            # Corrigir soma
+            # Corrigir soma (ajuste numérico)
             diff = 1.0 - probs.sum()
             probs[np.argmax(probs)] += diff
 

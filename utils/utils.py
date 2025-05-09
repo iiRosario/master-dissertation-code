@@ -9,12 +9,17 @@ import csv
 import pandas as pd
 from torchvision.transforms import functional as F
 from matplotlib.ticker import MaxNLocator
+import zipfile
+import urllib.request
+from torchvision.datasets import ImageFolder
 import matplotlib.cm as cm
 from PIL import Image
-
+from collections import defaultdict
+import random
 
 CLASS_COLORS = ['royalblue', 'tomato', 'goldenrod','mediumseagreen', 'orchid', 'slateblue',  'darkorange', 'turquoise', 'firebrick', 'deeppink']
 
+# Caminhos e constantes
 
 def get_label_distribution(dataset):
     labels = [dataset[i][1] for i in range(len(dataset))]
@@ -27,9 +32,9 @@ def plot_distribution(dataset, distribution, split_name, save_path='.', colors=C
     if dataset == "CIFAR-10":
         dataset = "CIFAR 10"
     elif dataset == "MNIST_FASHION":
-        dataset = "MNIST Fashion"
-    elif dataset == "EMNIST_DIGITS":
-        dataset = "EMNIST Digits"
+        dataset = "MNIST-Fashion"
+    elif dataset == "EMNIST_LETTERS":
+        dataset = "EMNIST-Letters"
 
 
     plt.figure(figsize=(6, 4))
@@ -90,69 +95,38 @@ def plot_sample_images(dataset, classes, num_samples=6):
 
 
 
-def plot_sample_images(dataset, classes, num_samples=5, num_classes=10, save_path='sample_plot.png'):
-    """
-    Plota e salva uma grade de imagens com uma coluna por classe e uma linha por amostra.
-
-    Parâmetros:
-        dataset (torch.utils.data.Dataset): Dataset PyTorch (ex: CIFAR-10, FashionMNIST, MNIST, EMNIST).
-        classes (list): Lista de índices das classes a visualizar (1 por coluna).
-        num_samples (int): Número de imagens por classe (1 por linha).
-        num_classes (int): Número de classes a incluir no plot (limita o tamanho de `classes`).
-        save_path (str): Caminho para salvar a figura gerada.
-    """
-
-    # Reduzir a lista de classes conforme o limite desejado
+def plot_sample_images(dataset, classes, num_samples=5, num_classes=5, save_path='sample_plot.png'):
     classes = classes[:num_classes]
+    class_images = {}
 
-    # Identificar o nome do dataset
-    dataset_name = dataset.__class__.__name__
+    # Coletar imagens por classe
+    for cls in classes:
+        class_images[cls] = []
 
-    if 'CIFAR10' in dataset_name:
-        all_class_names = [
-            'airplane', 'automobile', 'bird', 'cat', 'deer',
-            'dog', 'frog', 'horse', 'ship', 'truck'
-        ]
-    elif 'FashionMNIST' in dataset_name:
-        all_class_names = [
-            'T-shirt/top', 'Trouser', 'Pullover', 'Dress', 'Coat',
-            'Sandal', 'Shirt', 'Sneaker', 'Bag', 'Ankle boot'
-        ]
-    elif 'MNIST' in dataset_name and 'Fashion' not in dataset_name:
-        all_class_names = [str(i) for i in range(10)]
-    elif 'EMNIST' in dataset_name:
-        all_class_names = [chr(i) for i in range(ord('A'), ord('Z') + 1)]
-    elif 'SVHN' in dataset_name:
-        all_class_names = [str(i) for i in range(10)]
-    else:
-        all_class_names = [str(i) for i in range(100)]
-
-    is_emnist_letters = 'EMNIST' in dataset_name and max(classes) > 9
-
-    class_names = {}
-    for i in classes:
-        if is_emnist_letters:
-            class_names[i] = all_class_names[i - 1]
-        else:
-            class_names[i] = all_class_names[i]
-
-    class_images = {cls: [] for cls in classes}
-    
     for img, label in dataset:
         label = label.item() if isinstance(label, torch.Tensor) else label
-        if label in classes and len(class_images[label]) < num_samples:
+        if label in class_images and len(class_images[label]) < num_samples:
             class_images[label].append(img)
-        if all(len(class_images[cls]) >= num_samples for cls in classes):
+        if all(len(imgs) >= num_samples for imgs in class_images.values()):
             break
 
-    fig, axes = plt.subplots(num_samples, len(classes), figsize=(len(classes)*2.5, num_samples*2.5))
+    # Remover classes que não têm imagens suficientes
+    class_images = {cls: imgs for cls, imgs in class_images.items() if len(imgs) == num_samples}
+    valid_classes = list(class_images.keys())
 
-    if num_samples == 1:
-        axes = axes.reshape(1, -1)
-    if len(classes) == 1:
-        axes = axes.reshape(-1, 1)
+    # Criar grid de subplots apenas com classes válidas
+    fig, axes = plt.subplots(num_samples, len(valid_classes), figsize=(len(valid_classes) * 2.5, num_samples * 2.5))
 
-    for col, cls in enumerate(classes):
+    # Garantir que axes seja 2D
+    if num_samples == 1 and len(valid_classes) == 1:
+        axes = np.array([[axes]])
+    elif num_samples == 1:
+        axes = np.expand_dims(axes, axis=0)
+    elif len(valid_classes) == 1:
+        axes = np.expand_dims(axes, axis=1)
+
+    # Plotar imagens
+    for col, cls in enumerate(valid_classes):
         for row, img in enumerate(class_images[cls]):
             ax = axes[row, col]
 
@@ -166,14 +140,18 @@ def plot_sample_images(dataset, classes, num_samples=5, num_classes=10, save_pat
                 img = img.permute(1, 2, 0)
 
             ax.imshow(img.squeeze(), cmap='gray' if img.ndimension() == 2 or img.shape[-1] == 1 else None)
-            ax.axis('off')  # <-- Aqui desativa os eixos
+            ax.axis('off')
 
-        axes[0, col].set_title(class_names[cls], fontsize=12)
+    # Ocultar quaisquer eixos vazios
+    for ax in axes.flat:
+        if len(ax.get_images()) == 0:
+            ax.set_visible(False)
 
     plt.tight_layout()
     plt.savefig(save_path)
-    plt.show()
-    plt.close()
+    #plt.show()
+    #plt.close()
+
 
 # Filter dataset for selected classes (e.g., [0, 1, 2])
 def filter_classes(dataset, classes=[0, 1, 2]):
@@ -382,3 +360,27 @@ def save_class_distributions_to_csv_2(init_train_dist, rest_train_dist, path):
             writer.writerow([cls, train_count, val_count])
 
 
+def stratified_split(dataset, train_pct=0.7, val_pct=0.1, test_pct=0.2):
+    """
+    Divide um dataset em subconjuntos de treino, validação e teste, garantindo que a distribuição das classes seja balanceada.
+    """
+    label_to_indices = defaultdict(list)
+
+    # Agrupar índices por classe
+    for idx, (_, label) in enumerate(dataset):
+        label_to_indices[label].append(idx)
+
+    train_indices, val_indices, test_indices = [], [], []
+
+    for label, indices in label_to_indices.items():
+        random.shuffle(indices)
+        total = len(indices)
+        n_train = int(train_pct * total)
+        n_val = int(val_pct * total)
+        n_test = total - n_train - n_val
+
+        train_indices.extend(indices[:n_train])
+        val_indices.extend(indices[n_train:n_train + n_val])
+        test_indices.extend(indices[n_train + n_val:])
+
+    return Subset(dataset, train_indices), Subset(dataset, val_indices), Subset(dataset, test_indices)
