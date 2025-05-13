@@ -18,6 +18,7 @@ class LeNet5(nn.Module):
         self.epochs = epochs
         self.lr = lr
         self.batch_size = batch_size
+        self.last_train_loss = -1.0
 
         if dataset in (DATASET_CIFAR_10, DATASET_CIFAR_100):
             in_channels = 3
@@ -83,8 +84,8 @@ class LeNet5(nn.Module):
                 optimizer.step()
                 running_loss += loss.item()
 
-            #avg_train_loss = running_loss / len(train_loader)
-            #print(f"    Epoch [{epoch+1}/{self.epochs}] - Train Loss: {avg_train_loss:.4f}")
+            avg_train_loss = running_loss / len(train_loader)
+            self.last_train_loss = avg_train_loss  # salva como atributo da instância
 
         return self
 

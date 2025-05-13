@@ -119,7 +119,7 @@ def init_active_learning_pool(train_loader, val_loader, test_loader, seed):
 
     # Avaliação inicial
     init_metrics = learner.estimator.evaluate(x_val, y_val)
-    write_metrics_to_csv(results_path, results_file, cycle=0, oracle_label=-1, ground_truth_label=-1,  metrics=init_metrics, oracle_cm=-1, oracle_iterations=-1)
+    write_metrics_to_csv(results_path, results_file, cycle=0, oracle_label=-1, ground_truth_label=-1,  metrics=init_metrics, oracle_cm=-1, oracle_iterations=-1, training_loss=learner.estimator.last_train_loss)
 
     oracle = Committee(size=ORACLE_SIZE_IN_USE, seed=seed, expertise=EXPERTISE_IN_USE, results_path=results_path, rating_flag=RATING_FLAG)
     
@@ -162,7 +162,9 @@ def init_active_learning_pool(train_loader, val_loader, test_loader, seed):
                             ground_truth_label=list_true_labels,
                             metrics=metrics,
                             oracle_cm=oracle.cm,
-                            oracle_iterations=oracle.labeling_iteration)
+                            oracle_iterations=oracle.labeling_iteration,
+                            training_loss=learner.estimator.last_train_loss
+                            )
     
     # --- pós-processamento ---
     plot_all_metrics_over_cycles(csv_path, plots_path, seed)

@@ -19,13 +19,14 @@ class Annotator:
         self.alpha = alpha                    #Score Ratings weight
         self.beta = beta                      #Accuracy  Weight
         self.expertise = expertise
+        self.expert_class = -1
         
         if self.expertise == LOW_EXPERTISE:
             self.cm_prob = self.init_cm_prob_specialist(target_accuracy=0.4, scale=1)
         elif self.expertise == MEDIUM_EXPERTISE:
-            self.cm_prob = self.init_cm_prob_specialist(target_accuracy=0.6, scale=1)
+            self.cm_prob = self.init_cm_prob_specialist(target_accuracy=0.7, scale=1)
         elif self.expertise == HIGH_EXPERTISE:
-            self.cm_prob = self.init_cm_prob_specialist(target_accuracy=0.8, scale=1)
+            self.cm_prob = self.init_cm_prob_specialist(target_accuracy=0.98, scale=1)
         elif self.expertise == RANDOM_EXPERTISE:
             self.cm_prob = self.init_cm_prob_random()
 
@@ -92,6 +93,7 @@ class Annotator:
 
         cm_prob = np.zeros((self.num_classes, self.num_classes))
         expert_class = np.random.randint(0, self.num_classes)
+        self.expert_class = expert_class
 
         # Fator para classe especialista
         denom_expert = 1.0 - target_accuracy

@@ -4,6 +4,9 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from env import *
+from matplotlib.cm import get_cmap
+from matplotlib import colormaps
+
 
 def plot_accuracy_with_std(base_path: str,
                                   results_prefix: str = "results_",
@@ -226,6 +229,318 @@ def plot_f1_score_with_std(base_path: str,
         plt.close()
     else:
         plt.show()
+
+
+
+def compare_accuracy_with_without_rating(base_dir: str,
+                                         dataset: str,
+                                         query_strategy: str,
+                                         strategy: str,
+                                         oracle_size: str,
+                                         expertise: str,
+                                         confusion_column: str = "confusion_matrix",
+                                         results_prefix: str = "results_",
+                                         save_path: str = None):
+
+    conditions = {
+        "without_rating": os.path.join(base_dir, dataset, query_strategy, strategy, "without_rating", oracle_size, expertise),
+        "with_rating": os.path.join(base_dir, dataset, query_strategy, strategy, "with_rating", oracle_size, expertise)
+    }
+
+    color_map = {
+        "without_rating": "blue",
+        "with_rating": "green"
+    }
+
+    all_results = {}
+
+    for condition, path in conditions.items():
+        all_accuracies = {}
+
+        if not os.path.isdir(path):
+            print(f"[IGNORADO] Pasta não encontrada: {path}")
+            continue
+
+        for folder in os.listdir(path):
+            folder_path = os.path.join(path, folder)
+            if os.path.isdir(folder_path) and folder.startswith(results_prefix):
+                for file in os.listdir(folder_path):
+                    if file.endswith(".csv"):
+                        file_path = os.path.join(folder_path, file)
+
+                        try:
+                            df = pd.read_csv(file_path, sep=None, engine='python')
+                            df.columns = [col.strip().replace('\ufeff', '') for col in df.columns]
+
+                            for _, row in df.iterrows():
+                                cycle = int(row['cycle'])
+                                confusion_str = row[confusion_column]
+                                confusion = np.array(ast.literal_eval(confusion_str))
+                                correct = np.trace(confusion)
+                                total = np.sum(confusion)
+                                accuracy = correct / total if total > 0 else 0.0
+
+                                if cycle not in all_accuracies:
+                                    all_accuracies[cycle] = []
+                                all_accuracies[cycle].append(accuracy)
+
+                        except Exception as e:
+                            print(f"Erro no arquivo {file_path}, linha {row.name}: {e}")
+
+        if all_accuracies:
+            cycles = sorted(all_accuracies.keys())
+            mean_accuracies = [np.mean(all_accuracies[c]) for c in cycles]
+            std_accuracies = [np.std(all_accuracies[c]) for c in cycles]
+            all_results[condition] = (cycles, mean_accuracies, std_accuracies)
+
+    # Plotagem comparativa
+    plt.figure(figsize=(10, 6))
+    for condition, (cycles, means, stds) in all_results.items():
+        means_array = np.array(means)
+        stds_array = np.array(stds)
+        upper = np.clip(means_array + stds_array, 0, 1)
+        lower = np.clip(means_array - stds_array, 0, 1)
+
+        plt.plot(cycles, means, label=condition.replace("_", " ").title(), linewidth=2, color=color_map[condition])
+        plt.fill_between(cycles, lower, upper, alpha=0.2, color=color_map[condition])
+
+    plt.xlabel('Cycle')
+    plt.ylabel('Accuracy (Avg. ± std)')
+    plt.title(f'Accuracy Comparison - {strategy.replace("_", " ").title()} - {dataset}')
+    plt.grid(True)
+    plt.legend()
+    plt.tight_layout()
+
+    if save_path:
+        plt.savefig(save_path)
+        print(f"Gráfico salvo em {save_path}")
+        plt.close()
+    else:
+        plt.show()
+
+
+# =================================================================================
+
+
+
+
+def compare_rating_effect_across_expertise(base_dir: str,
+                                           dataset: str,
+                                           query_strategy: str,
+                                           strategy: str,
+                                           oracle_size: str,
+                                           confusion_column: str = "confusion_matrix",
+                                           results_prefix: str = "results_",
+                                           save_dir: str = None,
+                                           filename: str = None):
+    expertise_levels = ["H", "L", "M", "R"]
+    rating_conditions = ["with_rating", "without_rating"]
+
+    # Gradientes por expertise
+    orange_gradient = colormaps["Oranges"](np.linspace(0.5, 0.9, len(expertise_levels)))
+    purple_gradient = colormaps["Purples"](np.linspace(0.5, 0.9, len(expertise_levels)))
+    color_map = {
+        "with_rating": {e: orange_gradient[i] for i, e in enumerate(expertise_levels)},
+        "without_rating": {e: purple_gradient[i] for i, e in enumerate(expertise_levels)}
+    }
+
+    line_styles = {
+        "H": "-",
+        "L": "--",
+        "M": "-.",
+        "R": ":"
+    }
+
+    all_results = {}
+
+    for rating in rating_conditions:
+        for expertise in expertise_levels:
+            key = f"{rating}_{expertise}"
+            path = os.path.join(base_dir, dataset, query_strategy, strategy, rating, oracle_size, expertise)
+            all_accuracies = {}
+
+            if not os.path.isdir(path):
+                print(f"[IGNORADO] Pasta não encontrada: {path}")
+                continue
+
+            for folder in os.listdir(path):
+                folder_path = os.path.join(path, folder)
+                if os.path.isdir(folder_path) and folder.startswith(results_prefix):
+                    for file in os.listdir(folder_path):
+                        if file.endswith(".csv"):
+                            file_path = os.path.join(folder_path, file)
+
+                            try:
+                                df = pd.read_csv(file_path, sep=None, engine='python')
+                                df.columns = [col.strip().replace('\ufeff', '') for col in df.columns]
+
+                                for _, row in df.iterrows():
+                                    cycle = int(row['cycle'])
+                                    confusion_str = row[confusion_column]
+                                    confusion = np.array(ast.literal_eval(confusion_str))
+                                    correct = np.trace(confusion)
+                                    total = np.sum(confusion)
+                                    accuracy = correct / total if total > 0 else 0.0
+
+                                    if cycle not in all_accuracies:
+                                        all_accuracies[cycle] = []
+                                    all_accuracies[cycle].append(accuracy)
+
+                            except Exception as e:
+                                print(f"Erro no arquivo {file_path}, linha {row.name}: {e}")
+
+            if all_accuracies:
+                cycles = sorted(all_accuracies.keys())
+                mean_accuracies = [np.mean(all_accuracies[c]) for c in cycles]
+                std_accuracies = [np.std(all_accuracies[c]) for c in cycles]
+                all_results[key] = (cycles, mean_accuracies, std_accuracies)
+
+    # Plotagem
+    plt.figure(figsize=(12, 7))
+    for key, (cycles, means, stds) in all_results.items():
+        rating, expertise = key.rsplit("_", 1)
+        color = color_map[rating][expertise]
+        linestyle = line_styles[expertise]
+        label = f"{expertise} ({'Com' if rating == 'with_rating' else 'Sem'} rating)"
+
+        means_array = np.array(means)
+        stds_array = np.array(stds)
+        upper = np.clip(means_array + stds_array, 0, 1)
+        lower = np.clip(means_array - stds_array, 0, 1)
+
+        plt.plot(cycles, means, label=label, linewidth=2, color=color, linestyle=linestyle)
+        plt.fill_between(cycles, lower, upper, alpha=0.15, color=color)
+
+    plt.xlabel("Cycle")
+    plt.ylabel("Accuracy (Avg. ± std)")
+    plt.title(f"Comparação de Acurácia por Expertise - {dataset}, {strategy}, oracle={oracle_size}")
+    plt.grid(True)
+    plt.legend()
+    plt.tight_layout()
+
+    if save_dir:
+        if not os.path.exists(save_dir):
+            os.makedirs(save_dir)
+        if filename:
+            save_path = os.path.join(save_dir, filename)
+        else:
+            auto_name = f"accuracy_comparison_{dataset}_{strategy}_{oracle_size}.png"
+            save_path = os.path.join(save_dir, auto_name)
+        plt.savefig(save_path)
+        print(f"Gráfico salvo em {save_path}")
+        plt.close()
+    else:
+        plt.show()
+
+
+def compare_rating_effect_by_oracle_size(base_dir: str,
+                                         dataset: str,
+                                         query_strategy: str,
+                                         strategy: str,
+                                         expertise: str,  # fixado
+                                         confusion_column: str = "confusion_matrix",
+                                         results_prefix: str = "results_",
+                                         save_dir: str = None,
+                                         filename: str = None):
+    oracle_sizes = ["5", "15", "30"]
+    rating_conditions = ["with_rating", "without_rating"]
+
+    # Cores em gradiente (3 tons por condição)
+    orange_gradient = get_cmap("Oranges")(np.linspace(0.5, 0.9, len(oracle_sizes)))
+    purple_gradient = get_cmap("Purples")(np.linspace(0.5, 0.9, len(oracle_sizes)))
+    color_map = {
+        "with_rating": orange_gradient,
+        "without_rating": purple_gradient
+    }
+
+    all_results = {}
+
+    for i, oracle_size in enumerate(oracle_sizes):
+        for rating in rating_conditions:
+            key = f"{rating}_{oracle_size}"
+            path = os.path.join(base_dir, dataset, query_strategy, strategy, rating, oracle_size, expertise)
+            all_accuracies = {}
+
+            if not os.path.isdir(path):
+                print(f"[IGNORADO] Pasta não encontrada: {path}")
+                continue
+
+            for folder in os.listdir(path):
+                folder_path = os.path.join(path, folder)
+                if os.path.isdir(folder_path) and folder.startswith(results_prefix):
+                    for file in os.listdir(folder_path):
+                        if file.endswith(".csv"):
+                            file_path = os.path.join(folder_path, file)
+
+                            try:
+                                df = pd.read_csv(file_path, sep=None, engine='python')
+                                df.columns = [col.strip().replace('\ufeff', '') for col in df.columns]
+
+                                for _, row in df.iterrows():
+                                    cycle = int(row['cycle'])
+                                    confusion_str = row[confusion_column]
+                                    confusion = np.array(ast.literal_eval(confusion_str))
+                                    correct = np.trace(confusion)
+                                    total = np.sum(confusion)
+                                    accuracy = correct / total if total > 0 else 0.0
+
+                                    if cycle not in all_accuracies:
+                                        all_accuracies[cycle] = []
+                                    all_accuracies[cycle].append(accuracy)
+
+                            except Exception as e:
+                                print(f"Erro no arquivo {file_path}, linha {row.name}: {e}")
+
+            if all_accuracies:
+                cycles = sorted(all_accuracies.keys())
+                mean_accuracies = [np.mean(all_accuracies[c]) for c in cycles]
+                std_accuracies = [np.std(all_accuracies[c]) for c in cycles]
+                all_results[key] = {
+                    "cycles": cycles,
+                    "means": mean_accuracies,
+                    "stds": std_accuracies,
+                    "color": color_map[rating][i]
+                }
+
+    # Plotagem
+    plt.figure(figsize=(12, 7))
+    for key, data in all_results.items():
+        rating, oracle_size = key.rsplit("_", 1)
+        label = f"oracle={oracle_size} ({'Com' if rating == 'with_rating' else 'Sem'} rating)"
+        cycles = data["cycles"]
+        means = np.array(data["means"])
+        stds = np.array(data["stds"])
+        color = data["color"]
+
+        upper = np.clip(means + stds, 0, 1)
+        lower = np.clip(means - stds, 0, 1)
+
+        plt.plot(cycles, means, label=label, linewidth=2, color=color)
+        plt.fill_between(cycles, lower, upper, alpha=0.15, color=color)
+
+    plt.xlabel("Cycle")
+    plt.ylabel("Accuracy (Avg. ± std)")
+    plt.title(f"Comparação por Oracle Size - Expertise {expertise}, {dataset}, {strategy}")
+    plt.grid(True)
+    plt.legend()
+    plt.tight_layout()
+
+    if save_dir:
+        if not os.path.exists(save_dir):
+            os.makedirs(save_dir)
+        if filename:
+            save_path = os.path.join(save_dir, filename)
+        else:
+            auto_name = f"accuracy_oracle_comparison_{dataset}_{strategy}_{expertise}.png"
+            save_path = os.path.join(save_dir, auto_name)
+        plt.savefig(save_path)
+        print(f"Gráfico salvo em {save_path}")
+        plt.close()
+    else:
+        plt.show()
+
+
+
 
 
 # =================================================================================
@@ -977,14 +1292,40 @@ def plot_all_results(dataset):
 
 
 def main():
-    plot_all_results(dataset=DATASET_MNIST_FASHION)
-    plot_all_results(dataset=DATASET_MNIST)
-    plot_all_results(dataset=DATASET_CIFAR_10)
-    plot_all_results(dataset=DATASET_EMNIST_DIGITS)
+    #plot_all_results(dataset=DATASET_MNIST_FASHION)
+    #plot_all_results(dataset=DATASET_MNIST)
+    #plot_all_results(dataset=DATASET_CIFAR_10)
+    #plot_all_results(dataset=DATASET_EMNIST_DIGITS)
+
+    #compare_accuracy_with_without_rating(
+    #    base_dir=RESULTS_PATH,
+    #    dataset=DATASET_MNIST,
+    #    query_strategy="uncertainty_sampling",
+    #    strategy=ORACLE_ANSWER_REPUTATION,
+    #    oracle_size=str(ORACLE_SIZE_LARGE),
+    #    expertise=MEDIUM_EXPERTISE,
+    #    save_path="comparativo_accuracy.png"
+    #)
+    
+    compare_rating_effect_by_oracle_size(base_dir=RESULTS_PATH,
+                                         dataset=DATASET_MNIST_FASHION,
+                                         query_strategy="uncertainty_sampling",
+                                         strategy= ORACLE_ANSWER_REPUTATION,
+                                         expertise= LOW_EXPERTISE,  # fixado
+                                         save_dir="runs",
+                                         filename="fixed_expertise.png")
+
+    compare_rating_effect_across_expertise(
+        base_dir=RESULTS_PATH,
+        dataset=DATASET_MNIST_FASHION,
+        query_strategy="uncertainty_sampling",
+        strategy=ORACLE_ANSWER_REPUTATION,
+        oracle_size=str(ORACLE_SIZE_MEDIUM),
+        save_dir="runs",
+        filename="fixed_oracle_size.png"
+    )
 
 
-    
-    
 
 if __name__ == "__main__":
     main()

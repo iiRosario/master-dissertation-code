@@ -152,27 +152,23 @@ def extract_data(loader):
     return data, labels
 
 
+def write_metrics_to_csv(csv_path, csv_name, cycle, oracle_label, ground_truth_label,
+                         metrics, oracle_cm, oracle_iterations, training_loss):
+    fieldnames = [
+        "cycle", "accuracy_per_class", "precision_per_class", 
+        "recall_per_class", "f1_score_per_class", "sensitivity_per_class",
+        "specificity_per_class", "confusion_matrix", 
+        "oracle_label", "ground_truth_label", 
+        "oracle_confusion_matrix", "oracle_iterations",
+        "training_loss"  # nova coluna
+    ]
 
-
-    
-
-
-def write_metrics_to_csv(csv_path, csv_name, cycle, oracle_label, ground_truth_label, metrics, oracle_cm, oracle_iterations):
-    fieldnames = ["cycle", "accuracy_per_class", "precision_per_class", 
-                  "recall_per_class", "f1_score_per_class", "sensitivity_per_class",
-                  "specificity_per_class", "confusion_matrix", 
-                  "oracle_label", "ground_truth_label", 
-                  "oracle_confusion_matrix", "oracle_iterations"]
-
-    
-    # Caminho completo para o ficheiro
     full_csv_path = os.path.join(csv_path, csv_name)
     file_exists = os.path.isfile(full_csv_path)
 
     with open(full_csv_path, mode='a', newline='') as csv_file:
         writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
 
-        # Escreve o cabeçalho se o ficheiro for novo
         if not file_exists:
             writer.writeheader()
 
@@ -188,8 +184,10 @@ def write_metrics_to_csv(csv_path, csv_name, cycle, oracle_label, ground_truth_l
             "oracle_label": oracle_label,
             "ground_truth_label": ground_truth_label,
             "oracle_confusion_matrix": oracle_cm,
-            "oracle_iterations": oracle_iterations
+            "oracle_iterations": oracle_iterations,
+            "training_loss": training_loss  # nova informação
         })
+
 
     
 

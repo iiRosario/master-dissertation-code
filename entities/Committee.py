@@ -12,7 +12,7 @@ class Committee:
         self.results_path = results_path
         self.labeling_iteration = 0
         self.rating_flag = rating_flag
-
+        self.expert_classes = [0 for _ in range(len(CLASSES))]
         self.labeled_samples_class = [0 for _ in range(len(CLASSES))]
         self.cm = np.zeros((len(CLASSES), len(CLASSES)))
 
@@ -29,8 +29,20 @@ class Committee:
 
             #print(f"alpha: {alpha}, beta: {beta}")
             ann = Annotator(id=i, seed=seed+i, num_classes=len(CLASSES), alpha=alpha, beta=beta, expertise=expertise)
+            self.expert_classes[ann.expert_class] += 1
             self.annotators.append(ann)
-    
+            
+        # Guardar os labeled_samples_class num ficheiro
+        if self.results_path:
+            try:
+                output_file = os.path.join(self.results_path, "expert_classes.txt")
+                with open(output_file, "w") as f:
+                    f.write(str(self.expert_classes))
+                print(f"[INFO] expert_classes guardado em {output_file}")
+            except Exception as e:
+                print(f"[ERRO] Falha ao escrever expert_classes.txt: {e}")
+
+
 
     def update_metrics(self, answer, true_target):
         self.cm[true_target, answer] += 1
