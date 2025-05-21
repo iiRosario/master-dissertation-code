@@ -239,7 +239,6 @@ def main(dataset):
         transforms.Normalize((0.5,), (0.5,))
     ])
 
-
     if DATASET_IN_USE == DATASET_MNIST:
         train_data = datasets.MNIST(root='./data', train=True, download=True, transform=transform_28_28)
         test_data = datasets.MNIST(root='./data', train=False, download=True, transform=transform_28_28)

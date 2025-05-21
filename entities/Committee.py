@@ -24,6 +24,8 @@ class Committee:
                 alpha, beta = 0.5, 0.5
             elif self.rating_flag == WITHOUT_RATING:    
                 alpha, beta = 0.0, 1.0
+            elif self.rating_flag == WITH_ONLY_RATING:
+                alpha, beta = 1.0, 0.0
             else:                                       
                 alpha, beta = 0.5, 0.5  
 
@@ -65,7 +67,7 @@ class Committee:
             annotator.answer(true_target)
         
         # RATE OTHERS (skip self)
-        if(self.rating_flag == WITH_RATING):
+        if(self.rating_flag != WITHOUT_RATING):
             for who_rates in self.annotators:
                 for other in self.annotators:
                     if who_rates is not other:
