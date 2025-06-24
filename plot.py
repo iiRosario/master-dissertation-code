@@ -1921,7 +1921,7 @@ def save_metrics_summary_csv(base_dir: str,
                               filename_prefix: str = None):
     strategy = "reputation_based"
     expertise_levels = ["H", "M", "L"]
-    rating_conditions = ["with_rating", "without_rating"]
+    rating_conditions = ["with_rating", "without_rating", WITH_ONLY_RATING]
     metric_columns = {
         "accuracy": "accuracy_per_class",
         "precision": "precision_per_class",
@@ -2016,7 +2016,7 @@ def export_classwise_annotator_stats_to_csv(base_dir: str,
 
     num_classes = len(classes)
     expertise_levels = ["H", "M", "L"]
-    rating_flags = ["with_rating", "without_rating"]
+    rating_flags = [WITH_RATING, WITHOUT_RATING, WITH_ONLY_RATING]
 
     # Estrutura: (expertise, class_idx) -> lista de contagens
     data_by_class = {}
@@ -2149,11 +2149,11 @@ def main():
     #plot_all_results(dataset=DATASET_EMNIST_DIGITS)
 
 
-    """ for dataset in DATASETS:
+    for dataset in DATASETS:
         for expertise in EXPERTISES:
             filename_1 = f"{dataset}_{expertise}_rating_comparison.png"
             save_dir = os.path.join(RESULTS_PATH, dataset, "plots", "expertise_comparison")
-            compare_rating_effect_by_oracle_size(base_dir=RESULTS_PATH, dataset=dataset, query_strategy="uncertainty_sampling", strategy="reputation_based", expertise=expertise, save_dir=save_dir, filename=filename_1) """
+            compare_rating_effect_by_oracle_size(base_dir=RESULTS_PATH, dataset=dataset, query_strategy="uncertainty_sampling", strategy="reputation_based", expertise=expertise, save_dir=save_dir, filename=filename_1) 
 
     
     """ for dataset in DATASETS:
@@ -2191,18 +2191,18 @@ def main():
             plot_bar_experts_by_class(base_dir=RESULTS_PATH, dataset=dataset, query_strategy="uncertainty_sampling", strategy="reputation_based", oracle_size=str(oracle_size), save_path=save_dir, filename=filename_2) """
     
     
-    """    for dataset in DATASETS:
+    """ for dataset in DATASETS:
         save_dir = os.path.join(RESULTS_PATH, dataset, "plots", "tables")
         filename_1 = f"{dataset}_table"
-        save_metrics_summary_csv(base_dir=RESULTS_PATH, dataset=dataset, query_strategy="uncertainty_sampling", save_path=save_dir, filename_prefix=filename_1) """
-   
-    """for dataset in DATASETS:
+        save_metrics_summary_csv(base_dir=RESULTS_PATH, dataset=dataset, query_strategy="uncertainty_sampling", save_path=save_dir, filename_prefix=filename_1)
+    """
+    """ for dataset in DATASETS:
         for oracle_size in ORACLE_SIZES:  
             save_dir = os.path.join(RESULTS_PATH, dataset, "plots", "reputation_contributions")
             filename_1 = f"{dataset}_{str(oracle_size)}_reputation.png"    
-            plot_reputation_contributions(base_dir=RESULTS_PATH, dataset=dataset, query_strategy="uncertainty_sampling", oracle_size=str(oracle_size), save_path=save_dir, filename=filename_1)
-     """
-    for dataset in DATASETS:
+            plot_reputation_contributions(base_dir=RESULTS_PATH, dataset=dataset, query_strategy="uncertainty_sampling", oracle_size=str(oracle_size), save_path=save_dir, filename=filename_1) """
+    
+    """  for dataset in DATASETS:
         for oracle_size in ORACLE_SIZES:  
             filename_2 = f"{dataset}_annotators_in_{str(oracle_size)}.csv"
             save_dir = os.path.join(RESULTS_PATH, dataset, "plots", "annotators")
@@ -2214,6 +2214,9 @@ def main():
                 oracle_size=str(oracle_size),
                 save_path=save_dir,
                 filename=filename_2)
+    """
 
+
+    
 if __name__ == "__main__":
     main()

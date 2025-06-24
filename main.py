@@ -291,22 +291,10 @@ def main(dataset):
     init_perm_query_strategy(train_loader=train_loader, val_loader=val_loader, test_loader=test_loader)
 
     
-def test_oracle(dataset):
-    global DATASET_IN_USE
-    global QUERY_STRATEGY_IN_USE
-    global ORACLE_ANSWER_IN_USE
-    global EXPERTISE_IN_USE
-    global ORACLE_SIZE_IN_USE
+
+
     
-    DATASET_IN_USE = dataset
-    QUERY_STRATEGY_IN_USE = UNCERTAINTY_SAMPLING
-    ORACLE_ANSWER_IN_USE = ORACLE_ANSWER_REPUTATION
-    EXPERTISE_IN_USE = EXPERT_EXPERTISE
-    ORACLE_SIZE_IN_USE = ORACLE_SIZE_LARGE
-
-
-    results_path = create_results_dir(seed=1)
-    committee = Committee(size=ORACLE_SIZE_IN_USE, seed=30, expertise=EXPERTISE_IN_USE, results_path = results_path)
+    
     
     for i in range(1):
         print("=======================================================")
